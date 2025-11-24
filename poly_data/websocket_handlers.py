@@ -35,9 +35,19 @@ async def connect_market_websocket(chunk):
             # Process incoming market data indefinitely
             while True:
                 message = await websocket.recv()
-                json_data = json.loads(message)
-                # Process order book updates and trigger trading as needed
-                process_data(json_data)
+                try:
+                    json_data = json.loads(message)
+                    # Ensure json_data is a dict and wrap in list
+                    if isinstance(json_data, dict):
+                        process_data([json_data])  # Wrap in list as process_data expects a list
+                    elif isinstance(json_data, list):
+                        process_data(json_data)
+                    else:
+                        print(f"Unexpected data type from websocket: {type(json_data)}")
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse JSON: {e}, message: {message[:100]}")
+                except Exception as e:
+                    print(f"Error processing websocket message: {e}")
         except websockets.ConnectionClosed:
             print("Connection closed in market websocket")
             print(traceback.format_exc())

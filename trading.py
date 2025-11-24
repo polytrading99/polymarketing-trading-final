@@ -152,7 +152,14 @@ async def perform_trade(market):
             round_length = len(str(row['tick_size']).split(".")[1])
 
             # Get trading parameters for this market type
-            params = global_state.params[row['param_type']]
+            param_type = row.get('param_type') or 'default'
+            if param_type not in global_state.params:
+                param_type = 'default'  # Use default if param_type doesn't exist
+            if not global_state.params:
+                # If no params loaded, use empty dict (will cause errors but won't crash)
+                params = {}
+            else:
+                params = global_state.params.get(param_type, global_state.params.get('default', {}))
             
             # Create a list with both outcomes for the market
             deets = [

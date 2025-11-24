@@ -36,8 +36,19 @@ def process_price_change(asset, side, price_level, new_size):
         book[price_level] = new_size
 
 def process_data(json_datas, trade=True):
-
+    # Handle both single dict and list
+    if isinstance(json_datas, dict):
+        json_datas = [json_datas]
+    
     for json_data in json_datas:
+        if not isinstance(json_data, dict):
+            print(f"Skipping invalid data type: {type(json_data)}")
+            continue
+        
+        if 'event_type' not in json_data:
+            print(f"Missing event_type in data: {list(json_data.keys())}")
+            continue
+        
         event_type = json_data['event_type']
         asset = json_data['market']
 
