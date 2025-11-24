@@ -384,6 +384,7 @@ async def perform_trade(market):
                 # 3. Buy amount is above minimum size
                 min_size = row.get('min_size') or 0
                 if position < max_size and position < 250 and buy_amount > 0 and buy_amount >= min_size:
+                    print(f"DEBUG: Entering buy order logic for {detail['name']}. position={position}, max_size={max_size}, buy_amount={buy_amount}, min_size={min_size}")
                     # Get reference price from market data
                     sheet_value = row['best_bid']
 
@@ -455,6 +456,12 @@ async def perform_trade(market):
                                 elif orders['buy']['size'] > order['size'] * 1.01:
                                     print(f"Resending buy orders because open orders are too large")
                                     send_buy_order(order)
+                                else:
+                                    # Debug: Log why we're not placing an order
+                                    print(f"DEBUG: Not placing buy order for {token}. "
+                                          f"best_bid={best_bid}, orders['buy']['price']={orders['buy']['price']}, "
+                                          f"position={position}, orders['buy']['size']={orders['buy']['size']}, "
+                                          f"max_size={max_size}, order['size']={order['size']}")
                                 # Commented out logic for cancelling orders when market conditions change
                                 # elif best_bid_size < orders['buy']['size'] * 0.98 and abs(best_bid - second_best_bid) > 0.03:
                                 #     print(f"Cancelling buy orders because best size is less than 90% of open orders and spread is too large")
