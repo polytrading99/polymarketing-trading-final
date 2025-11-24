@@ -53,12 +53,17 @@ def send_buy_order(order):
         return  # Don't place new order if existing one is fine
 
     # Calculate minimum acceptable price based on market spread
+    # Handle None mid_price
+    if order['mid_price'] is None:
+        print(f"Cannot calculate incentive_start: mid_price is None")
+        return  # Skip order placement if mid_price is None
+    
     incentive_start = order['mid_price'] - order['max_spread']/100
 
     trade = True
 
     # Don't place orders that are below incentive threshold
-    if order['price'] < incentive_start:
+    if incentive_start is not None and order['price'] < incentive_start:
         trade = False
 
     if trade:
@@ -230,13 +235,17 @@ async def perform_trade(market):
                     overall_ratio = 0
 
                 try:
-                    second_best_bid = round(second_best_bid, round_length)
-                    second_best_ask = round(second_best_ask, round_length)
+                    if second_best_bid is not None:
+                        second_best_bid = round(second_best_bid, round_length)
+                    if second_best_ask is not None:
+                        second_best_ask = round(second_best_ask, round_length)
                 except:
                     pass
                 
-                top_bid = round(top_bid, round_length)
-                top_ask = round(top_ask, round_length)
+                if top_bid is not None:
+                    top_bid = round(top_bid, round_length)
+                if top_ask is not None:
+                    top_ask = round(top_ask, round_length)
 
                 # Get our current position and average price
                 pos = get_position(token)
@@ -255,7 +264,13 @@ async def perform_trade(market):
                 ask_price = round(ask_price, round_length)
 
                 # Calculate mid price for reference
-                mid_price = (top_bid + top_ask) / 2
+                # Handle None values in top_bid or top_ask
+                if top_bid is not None and top_ask is not None:
+                    mid_price = (top_bid + top_ask) / 2
+                elif best_bid is not None and best_ask is not None:
+                    mid_price = (best_bid + best_ask) / 2
+                else:
+                    mid_price = None
                 
                 # Log market conditions for this outcome
                 print(f"\nFor {detail['answer']}. Orders: {orders} Position: {position}, "
@@ -356,14 +371,19 @@ async def perform_trade(market):
                         continue
 
                 # ------- BUY ORDER LOGIC -------
-                # Get max_size, defaulting to trade_size if not specified
-                max_size = row.get('max_size', row['trade_size'])
+                # Get max_size, defaulting to trade_size if not specified or NaN
+                max_size_raw = row.get('max_size')
+                if max_size_raw is None or (isinstance(max_size_raw, float) and pd.isna(max_size_raw)):
+                    max_size = row['trade_size']
+                else:
+                    max_size = max_size_raw
                 
                 # Only buy if:
                 # 1. Position is less than max_size (new logic)
                 # 2. Position is less than absolute cap (250)
                 # 3. Buy amount is above minimum size
-                if position < max_size and position < 250 and buy_amount > 0 and buy_amount >= row['min_size']:
+                min_size = row.get('min_size') or 0
+                if position < max_size and position < 250 and buy_amount > 0 and buy_amount >= min_size:
                     # Get reference price from market data
                     sheet_value = row['best_bid']
 
@@ -407,7 +427,7 @@ async def perform_trade(market):
                             rev_pos = get_position(rev_token)
 
                             # If we have significant opposing position, don't buy more
-                            if rev_pos['size'] > row['min_size']:
+                            if rev_pos['size'] > min_size:
                                 print("Bypassing creation of new buy order because there is a reverse position")
                                 if orders['buy']['size'] > CONSTANTS.MIN_MERGE_SIZE:
                                     print("Cancelling buy orders because there is a reverse position")
