@@ -270,7 +270,12 @@ async def perform_trade(market):
                 buy_amount, sell_amount = get_buy_sell_amount(position, bid_price, row, other_position)
                 
                 # Get max_size for logging (same logic as in get_buy_sell_amount)
-                max_size = row.get('max_size', row['trade_size'])
+                # Handle NaN values - if max_size is NaN or None, use trade_size
+                max_size_raw = row.get('max_size')
+                if max_size_raw is None or (isinstance(max_size_raw, float) and pd.isna(max_size_raw)):
+                    max_size = row['trade_size']
+                else:
+                    max_size = max_size_raw
 
                 # Prepare order object with all necessary information
                 order = {

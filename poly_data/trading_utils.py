@@ -1,4 +1,5 @@
 import math 
+import pandas as pd
 from poly_data.data_utils import update_positions
 import poly_data.global_state as global_state
 
@@ -153,8 +154,12 @@ def get_buy_sell_amount(position, bid_price, row, other_token_position=0):
     buy_amount = 0
     sell_amount = 0
 
-    # Get max_size, defaulting to trade_size if not specified
-    max_size = row.get('max_size', row['trade_size'])
+    # Get max_size, defaulting to trade_size if not specified or NaN
+    max_size_raw = row.get('max_size')
+    if max_size_raw is None or (isinstance(max_size_raw, float) and pd.isna(max_size_raw)):
+        max_size = row['trade_size']
+    else:
+        max_size = max_size_raw
     trade_size = row['trade_size']
     
     # Calculate total exposure across both sides
