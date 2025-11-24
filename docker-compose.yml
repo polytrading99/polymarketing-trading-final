@@ -11,6 +11,8 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8000
       LOG_LEVEL: INFO
+      VPS_IP: ${VPS_IP:-51.38.126.98}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://51.38.126.98:3000,http://51.38.126.98:3001}
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,10 +43,8 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     image: poly-maker-web:latest
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
     depends_on:
       - backend
     ports:

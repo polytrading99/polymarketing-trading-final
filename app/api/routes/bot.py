@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -85,8 +86,9 @@ async def start_bot(market_id: UUID, request: StartBotRequest) -> BotRunSummary:
         session.add(market)
         await session.flush()
         
-        # Create new bot run
+        # Create new bot run with explicit UUID
         bot_run = BotRun(
+            id=uuid.uuid4(),
             market_id=market_id,
             status="running",  # Store as string
             operator=request.operator,

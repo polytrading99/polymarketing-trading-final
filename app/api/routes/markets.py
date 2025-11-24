@@ -1,6 +1,7 @@
 from typing import Optional, TYPE_CHECKING
+import asyncio
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Response, status, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 
@@ -126,4 +127,121 @@ async def update_market_status(market_id: str, request: MarketUpdateRequest) -> 
 
     await repository.upsert_market(market)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class PolymarketMarketInfo(BaseModel):
+    """Information about a market from Polymarket API."""
+    question: str
+    condition_id: str
+    market_slug: Optional[str] = None
+    end_date_iso: Optional[str] = None
+    token_yes: Optional[str] = None
+    token_no: Optional[str] = None
+    outcome_yes: Optional[str] = None
+    outcome_no: Optional[str] = None
+    rewards_daily_rate: Optional[float] = None
+    min_size: Optional[float] = None
+    max_spread: Optional[float] = None
+
+
+@router.get("/current", response_model=list[PolymarketMarketInfo], summary="Fetch current open markets from Polymarket")
+async def fetch_current_polymarket_markets(
+    limit: Optional[int] = Query(default=100, description="Maximum number of markets to fetch")
+) -> list[PolymarketMarketInfo]:
+    """
+    Fetch currently open/active markets directly from Polymarket API.
+    
+    This endpoint connects to Polymarket's API and fetches all currently active markets.
+    Useful for discovering new markets or checking what's available on Polymarket.
+    """
+    def _fetch_markets_sync(limit: int):
+        """Synchronous function to fetch markets (runs in thread pool)."""
+        try:
+            from data_updater.trading_utils import get_clob_client
+            import pandas as pd
+            
+            client = get_clob_client()
+            if client is None:
+                return []
+            
+            cursor = ""
+            all_markets = []
+            count = 0
+            
+            while count < limit:
+                try:
+                    markets = client.get_sampling_markets(next_cursor=cursor)
+                    
+                    if not markets or 'data' not in markets:
+                        break
+                    
+                    all_markets.extend(markets['data'])
+                    count = len(all_markets)
+                    
+                    cursor = markets.get('next_cursor')
+                    if cursor is None:
+                        break
+                        
+                except Exception as e:
+                    break
+            
+            # Limit results
+            if len(all_markets) > limit:
+                all_markets = all_markets[:limit]
+            
+            # Convert to response format
+            result = []
+            for market in all_markets:
+                # Extract token information
+                token_yes = None
+                token_no = None
+                outcome_yes = None
+                outcome_no = None
+                
+                if 'tokens' in market and isinstance(market['tokens'], list):
+                    if len(market['tokens']) > 0:
+                        token_yes = market['tokens'][0].get('token_id')
+                        outcome_yes = market['tokens'][0].get('outcome')
+                    if len(market['tokens']) > 1:
+                        token_no = market['tokens'][1].get('token_id')
+                        outcome_no = market['tokens'][1].get('outcome')
+                
+                # Extract reward information
+                rewards_daily_rate = None
+                min_size = None
+                max_spread = None
+                
+                if 'rewards' in market and isinstance(market['rewards'], dict):
+                    rewards = market['rewards']
+                    rewards_daily_rate = rewards.get('rewards_daily_rate')
+                    min_size = rewards.get('min_size')
+                    max_spread = rewards.get('max_spread')
+                
+                result.append(PolymarketMarketInfo(
+                    question=market.get('question', ''),
+                    condition_id=market.get('condition_id', ''),
+                    market_slug=market.get('market_slug'),
+                    end_date_iso=market.get('end_date_iso'),
+                    token_yes=token_yes,
+                    token_no=token_no,
+                    outcome_yes=outcome_yes,
+                    outcome_no=outcome_no,
+                    rewards_daily_rate=rewards_daily_rate,
+                    min_size=min_size,
+                    max_spread=max_spread,
+                ))
+            
+            return result
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error fetching markets from Polymarket: {str(e)}"
+            )
+    
+    # Run the synchronous function in a thread pool
+    loop = asyncio.get_event_loop()
+    markets = await loop.run_in_executor(None, _fetch_markets_sync, limit)
+    
+    return markets
 

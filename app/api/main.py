@@ -29,15 +29,35 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     
-    # Configure CORS
+    # Configure CORS for local development and VPS deployment
+    # Can be overridden via CORS_ORIGINS environment variable
+    import os
+    default_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+    
+    # Add VPS origins if VPS_IP is set
+    vps_ip = os.getenv("VPS_IP", "")
+    if vps_ip:
+        vps_origins = [
+            f"http://{vps_ip}:3000",
+            f"http://{vps_ip}:3001",
+            f"http://{vps_ip}:8000",
+        ]
+        default_origins.extend(vps_origins)
+    
+    # Add environment-specific origins (comma-separated)
+    cors_origins_env = os.getenv("CORS_ORIGINS", "")
+    if cors_origins_env:
+        custom_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+        default_origins.extend(custom_origins)
+    
     fastapi_app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:3001",
-        ],
+        allow_origins=default_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
