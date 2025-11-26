@@ -258,13 +258,24 @@ def update_active_markets():
         global_state.db_lock.release()
 
 def update_markets():
+    # Get markets from database (which already filters for active markets with running bots)
+    # This avoids a separate query that conflicts with the config loading
     received_df, received_params = get_sheet_df()
 
     if len(received_df) > 0:
         global_state.df, global_state.params = received_df.copy(), received_params
     
-    # Update active markets from database
-    update_active_markets()
+    # Extract condition_ids from the loaded markets (they're already filtered for active + running bots)
+    # This is more reliable than a separate query
+    if global_state.df is not None and 'condition_id' in global_state.df.columns:
+        active_condition_ids = set(global_state.df['condition_id'].dropna().unique())
+        global_state.active_condition_ids = active_condition_ids
+        print(f"Updated active markets from loaded config: {len(active_condition_ids)} markets with running bots")
+        if active_condition_ids:
+            print(f"Active condition_ids: {list(active_condition_ids)[:5]}...")  # Show first 5
+    else:
+        # Fallback: try the separate query if df doesn't have condition_ids
+        update_active_markets()
 
     # Clear and rebuild all_tokens, but only for active markets
     global_state.all_tokens = []
