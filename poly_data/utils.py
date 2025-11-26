@@ -16,52 +16,55 @@ def pretty_print(txt, dic):
 
 
 def _load_snapshot() -> BotConfigSnapshot:
+    # Use database lock to prevent conflicts with other DB operations
+    import poly_data.global_state as global_state
+    global_state.db_lock.acquire(blocking=True, timeout=30)
+    
     async def _load() -> BotConfigSnapshot:
-        # Use database lock to prevent conflicts with other DB operations
-        import poly_data.global_state as global_state
-        global_state.db_lock.acquire(blocking=True, timeout=30)
+        provider = DatabaseConfigProvider()
         try:
-            provider = DatabaseConfigProvider()
-            try:
-                # Load only active markets from database
-                from app.config.repository import ConfigRepository
-                repo = ConfigRepository()
-                config = await repo.load_configuration(active_only=True)
-                from app.config.repository import to_snapshot
-                snapshot = to_snapshot(config)
-                if snapshot.markets:
-                    print(f"Loaded {len(snapshot.markets)} active markets from database")
-                    return snapshot
-            except Exception as exc:
-                print(f"Database configuration load failed: {exc}. Falling back to Google Sheets.")
-        finally:
-            global_state.db_lock.release()
+            # Load only active markets from database
+            from app.config.repository import ConfigRepository
+            repo = ConfigRepository()
+            config = await repo.load_configuration(active_only=True)
+            from app.config.repository import to_snapshot
+            snapshot = to_snapshot(config)
+            if snapshot.markets:
+                print(f"Loaded {len(snapshot.markets)} active markets from database")
+                return snapshot
+        except Exception as exc:
+            print(f"Database configuration load failed: {exc}. Falling back to Google Sheets.")
 
         sheet_provider = GoogleSheetConfigProvider()
         snapshot = await sheet_provider.fetch()
         print(f"Loaded {len(snapshot.markets)} markets from Google Sheets (fallback)")
         return snapshot
-
-    # Check if there's already a running event loop
+    
     try:
-        loop = asyncio.get_running_loop()
-        # If we're in a running loop, create a new event loop in a new thread
-        import concurrent.futures
-        
-        def run_in_thread():
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                return new_loop.run_until_complete(_load())
-            finally:
-                new_loop.close()
-        
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_in_thread)
-            return future.result()
-    except RuntimeError:
-        # No running loop, safe to use asyncio.run()
-        return asyncio.run(_load())
+
+        # Check if there's already a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # If we're in a running loop, create a new event loop in a new thread
+            import concurrent.futures
+            
+            def run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(_load())
+                finally:
+                    new_loop.close()
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_thread)
+                return future.result()
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            return asyncio.run(_load())
+    finally:
+        # Always release the lock
+        global_state.db_lock.release()
 
 
 def _snapshot_to_frames(snapshot: BotConfigSnapshot) -> tuple[pd.DataFrame, dict[str, dict]]:
