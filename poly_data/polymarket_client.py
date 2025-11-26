@@ -51,10 +51,20 @@ class PolymarketClient:
         key=os.getenv("PK")
         browser_address = os.getenv("BROWSER_ADDRESS")
 
-        # Don't print sensitive wallet information
+        # Validate credentials are set
+        if not key:
+            raise ValueError("PK (private key) environment variable is not set! Bot cannot authenticate.")
+        if not browser_address:
+            raise ValueError("BROWSER_ADDRESS environment variable is not set! Bot cannot identify wallet.")
+        
         print("Initializing Polymarket client...")
+        print(f"Wallet address: {browser_address[:10]}...{browser_address[-8:]}")
         chain_id=POLYGON
-        self.browser_wallet=Web3.to_checksum_address(browser_address)
+        
+        try:
+            self.browser_wallet=Web3.to_checksum_address(browser_address)
+        except Exception as e:
+            raise ValueError(f"Invalid BROWSER_ADDRESS format: {e}")
 
         # Initialize the Polymarket API client
         self.client = ClobClient(

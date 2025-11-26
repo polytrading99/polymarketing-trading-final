@@ -32,6 +32,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://poly:poly@postgres:5432/poly
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: INFO
+      PK: ${PK}
+      BROWSER_ADDRESS: ${BROWSER_ADDRESS}
+      SPREADSHEET_URL: ${SPREADSHEET_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
