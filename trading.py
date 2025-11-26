@@ -144,7 +144,12 @@ async def perform_trade(market):
         market (str): The market ID (condition_id) to trade on
     """
     # Check if this market is active (has running bot)
-    if market not in global_state.active_condition_ids:
+    # 'market' parameter might be a token ID or condition_id - check both
+    condition_id = market
+    if market in global_state.TOKEN_MARKETS:
+        condition_id = global_state.TOKEN_MARKETS[market]
+    
+    if condition_id not in global_state.active_condition_ids:
         # Market is not active, skip trading
         return
     
