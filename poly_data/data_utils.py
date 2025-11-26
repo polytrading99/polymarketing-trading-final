@@ -190,15 +190,25 @@ def update_active_markets():
                 condition_ids = {row[0] for row in result.all()}
                 return condition_ids
         
-        # Handle async call from sync context
-        try:
-            loop = asyncio.get_running_loop()
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(lambda: asyncio.run(_fetch_active()))
-                active_ids = future.result(timeout=5)
-        except RuntimeError:
-            active_ids = asyncio.run(_fetch_active())
+        # Always create a new event loop to avoid conflicts with existing async operations
+        import concurrent.futures
+        
+        def run_in_new_loop():
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(_fetch_active())
+            finally:
+                new_loop.close()
+        
+        # Run in a separate thread to avoid blocking and connection conflicts
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_new_loop)
+            try:
+                active_ids = future.result(timeout=10)
+            except concurrent.futures.TimeoutError:
+                print("Timeout waiting for active markets query")
+                active_ids = set()
         
         global_state.active_condition_ids = active_ids
         print(f"Updated active markets: {len(active_ids)} markets with running bots")
