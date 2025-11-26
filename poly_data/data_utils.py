@@ -204,8 +204,14 @@ def update_active_markets():
         print(f"Updated active markets: {len(active_ids)} markets with running bots")
         if active_ids:
             print(f"Active condition_ids: {list(active_ids)[:5]}...")  # Show first 5
+        elif len(active_ids) == 0:
+            print("WARNING: No active markets found. Make sure:")
+            print("  1. At least one market has status='active' in database")
+            print("  2. At least one bot_run has status='running' for that market")
     except Exception as e:
         print(f"Failed to update active markets from database: {e}")
+        import traceback
+        traceback.print_exc()
         # Don't clear active_condition_ids on error, keep previous state
 
 def update_markets():
