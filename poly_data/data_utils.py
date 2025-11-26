@@ -191,13 +191,13 @@ def update_active_markets():
                     condition_ids = {row[0] for row in result.all()}
                     return condition_ids
             except Exception as db_error:
-                # Handle connection errors gracefully
+                # Handle connection errors gracefully - re-raise to trigger fallback
                 error_msg = str(db_error)
                 if "ConnectionClosedError" in error_msg or "websocket" in error_msg.lower():
-                    print(f"Database connection closed, will retry on next update")
+                    print(f"Database connection closed, will try fallback method")
                 else:
                     print(f"Database query error: {db_error}")
-                return set()
+                raise  # Re-raise to trigger fallback
         
         # Always create a new event loop to avoid conflicts with existing async operations
         import concurrent.futures
@@ -216,8 +216,35 @@ def update_active_markets():
             try:
                 active_ids = future.result(timeout=10)
             except concurrent.futures.TimeoutError:
-                print("Timeout waiting for active markets query")
+                print("Timeout waiting for active markets query, trying fallback")
                 active_ids = set()
+            except Exception:
+                # Fall through to fallback
+                active_ids = set()
+        
+        # If async query failed, try direct SQL query as fallback
+        if not active_ids:
+            try:
+                import subprocess
+                print("Trying direct SQL fallback query...")
+                result = subprocess.run(
+                    [
+                        "docker", "compose", "exec", "-T", "postgres",
+                        "psql", "-U", "poly", "-d", "poly", "-t", "-A",
+                        "-c", "SELECT m.condition_id FROM market m JOIN bot_run br ON m.id = br.market_id WHERE m.status = 'active' AND CAST(br.status AS TEXT) = 'running';"
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd="/app"  # Run from app directory
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    active_ids = {line.strip() for line in result.stdout.strip().split('\n') if line.strip()}
+                    print(f"Fallback SQL query succeeded: {len(active_ids)} active markets")
+                else:
+                    print(f"Fallback SQL query returned no results or error")
+            except Exception as fallback_error:
+                print(f"Fallback SQL query also failed: {fallback_error}")
         
         global_state.active_condition_ids = active_ids
         print(f"Updated active markets: {len(active_ids)} markets with running bots")
