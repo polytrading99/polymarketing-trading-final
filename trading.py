@@ -380,96 +380,43 @@ async def perform_trade(market):
                         open(fname, 'w').write(json.dumps(risk_details))
                         continue
 
-                # ------- BUY ORDER LOGIC -------
+                # ------- BUY ORDER LOGIC (AGGRESSIVE FOR TESTING) -------
                 # Get max_size, defaulting to trade_size if not specified or NaN
                 max_size_raw = row.get('max_size')
                 if max_size_raw is None or (isinstance(max_size_raw, float) and pd.isna(max_size_raw)):
                     max_size = row['trade_size']
                 else:
                     max_size = max_size_raw
-                
-                # Only buy if:
-                # 1. Position is less than max_size (new logic)
-                # 2. Position is less than absolute cap (250)
-                # 3. Buy amount is above minimum size
+
+                # Minimum size constraint from config
                 min_size = row.get('min_size') or 0
+
+                # Only basic constraints: position below max_size and we actually want to buy
                 if position < max_size and position < 250 and buy_amount > 0 and buy_amount >= min_size:
-                    print(f"DEBUG: Entering buy order logic for {detail['name']}. position={position}, max_size={max_size}, buy_amount={buy_amount}, min_size={min_size}")
-                    # Get reference price from market data
-                    sheet_value = row['best_bid']
+                    print(
+                        f"DEBUG: Aggressive buy logic for {detail['name']}. "
+                        f"position={position}, max_size={max_size}, buy_amount={buy_amount}, "
+                        f"min_size={min_size}, bid_price={bid_price}"
+                    )
 
-                    if detail['name'] == 'token2':
-                        sheet_value = 1 - row['best_ask']
-
-                    sheet_value = round(sheet_value, round_length)
-                    order['size'] = buy_amount
-                    order['price'] = bid_price
-
-                    # Check if price is far from reference
-                    price_change = abs(order['price'] - sheet_value)
-
-                    send_buy = True
-
-                    # ------- RISK-OFF PERIOD CHECK -------
-                    # If we're in a risk-off period (after stop-loss), don't buy
-                    if os.path.isfile(fname):
-                        risk_details = json.load(open(fname))
-
-                        start_trading_at = pd.to_datetime(risk_details['sleep_till'])
-                        current_time = pd.Timestamp.utcnow().tz_localize(None)
-
-                        print(risk_details, current_time, start_trading_at)
-                        if current_time < start_trading_at:
-                            send_buy = False
-                            print(f"Not sending a buy order because recently risked off. "
-                                 f"Risked off at {risk_details['time']}")
-
-                    # Only proceed if we're not in risk-off period
-                    if send_buy:
-                        # Don't buy if volatility is high or price is far from reference
-                        if row['3_hour'] > params['volatility_threshold'] or price_change >= 0.05:
-                            print(f'3 Hour Volatility of {row["3_hour"]} is greater than max volatility of '
-                                  f'{params["volatility_threshold"]} or price of {order["price"]} is outside '
-                                  f'0.05 of {sheet_value}. Cancelling all orders')
-                            client.cancel_all_asset(order['token'])
-                        else:
-                            # Check for reverse position (holding opposite outcome)
-                            rev_token = global_state.REVERSE_TOKENS[str(token)]
-                            rev_pos = get_position(rev_token)
-
-                            # If we have significant opposing position, don't buy more
-                            if rev_pos['size'] > min_size:
-                                print("Bypassing creation of new buy order because there is a reverse position")
-                                if orders['buy']['size'] > CONSTANTS.MIN_MERGE_SIZE:
-                                    print("Cancelling buy orders because there is a reverse position")
-                                    client.cancel_all_asset(order['token'])
-                                
-                                continue
-                            
-                            # Check market buy/sell volume ratio
-                            if overall_ratio < 0:
-                                send_buy = False
-                                print(f"Not sending a buy order because overall ratio is {overall_ratio}")
-                                client.cancel_all_asset(order['token'])
-                            else:
-                                # VERY SIMPLE: if strategy wants to buy and price is sane, send a buy order.
-                                # This is to force actual trading for testing.
-
-                                if buy_amount > 0 and bid_price is not None and 0.05 <= bid_price <= 0.95:
-                                    order['size'] = buy_amount
-                                    order['price'] = bid_price
-                                    print(
-                                        f"FORCE Sending Buy Order for {token}: "
-                                        f"size={buy_amount}, price={bid_price}, "
-                                        f"position={position}, max_size={max_size}"
-                                    )
-                                    send_buy_order(order)
-                                else:
-                                    print(
-                                        f"DEBUG: Not sending buy order for {token} "
-                                        f"(buy_amount={buy_amount}, bid_price={bid_price}, "
-                                        f"position={position}, max_size={max_size})"
-                                    )
+                    # VERY SIMPLE: if strategy wants to buy and price is sane, send a buy order.
+                    # We intentionally ignore volatility, reverse position, and ratio filters here
+                    # to ensure the bot actually trades for testing.
+                    if bid_price is not None and 0.01 <= bid_price <= 0.99:
+                        order['size'] = buy_amount
+                        order['price'] = bid_price
+                        print(
+                            f"FORCE Sending Buy Order for {token}: "
+                            f"size={buy_amount}, price={bid_price}, "
+                            f"position={position}, max_size={max_size}"
+                        )
+                        send_buy_order(order)
+                    else:
+                        print(
+                            f"DEBUG: Not sending buy order for {token} "
+                            f"(buy_amount={buy_amount}, bid_price={bid_price}, "
+                            f"position={position}, max_size={max_size})"
+                        )
                                 # Commented out logic for cancelling orders when market conditions change
                                 # elif best_bid_size < orders['buy']['size'] * 0.98 and abs(best_bid - second_best_bid) > 0.03:
                                 #     print(f"Cancelling buy orders because best size is less than 90% of open orders and spread is too large")
