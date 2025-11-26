@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { ArrowRightCircle, Loader2, RefreshCcw, Play, Square, Database, Globe } from "lucide-react";
 import { fetchMarkets, fetchCurrentPolymarketMarkets, startBot, stopBot, updateMarketStatus, type Market, type PolymarketMarket } from "../lib/api";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import clsx from "clsx";
 import { DashboardStats, PnLChart } from "./dashboard";
 
@@ -12,10 +12,6 @@ const fetcher = () => fetchMarkets();
 type ViewMode = "database" | "live";
 
 export default function HomePage() {
-  // Demo mode: purely visual, front-end only, for screenshots.
-  // When true, the UI shows a \"running\" bot with animated stats even if backend is not working.
-  const DEMO_MODE = true;
-
   const [viewMode, setViewMode] = useState<ViewMode>("database");
   const { data, error, isLoading, mutate } = useSWR<Market[]>("/markets", fetcher, {
     refreshInterval: 10_000
@@ -34,129 +30,15 @@ export default function HomePage() {
   );
   const [loadingMarkets, setLoadingMarkets] = useState<Set<string>>(new Set());
 
-  // Local demo markets state (front‑end only, no backend dependency)
-  const [demoMarkets, setDemoMarkets] = useState<Market[] | null>(null);
-
-  // Initialize demo data and animate it slightly so it looks \"alive\"
-  useEffect(() => {
-    if (!DEMO_MODE) return;
-
-    // Seed demo markets – focused on the requested ETH market
-    const initial: Market[] = [
-      {
-        id: "demo-eth-3400",
-        condition_id: "0x_demo_eth_3400",
-        question: "Will Ethereum reach $3400 November 24-30?",
-        status: "active",
-        neg_risk: false,
-        token_yes: "0xYES_ETH_3400",
-        token_no: "0xNO_ETH_3400",
-        active_strategy: "volatility_maker",
-        pnl_total: 12.34,
-        fees_paid: 0.48,
-        position_count: 7,
-      },
-      {
-        id: "demo-btc",
-        condition_id: "0x_demo_btc",
-        question: "Will Bitcoin stay above $60k this week?",
-        status: "active",
-        neg_risk: false,
-        token_yes: "0xYES_BTC",
-        token_no: "0xNO_BTC",
-        active_strategy: "mean_reversion",
-        pnl_total: 4.21,
-        fees_paid: 0.22,
-        position_count: 3,
-      },
-      {
-        id: "demo-macro",
-        condition_id: "0x_demo_macro",
-        question: "Will US CPI print above 3.0% in November?",
-        status: "inactive",
-        neg_risk: false,
-        token_yes: "0xYES_CPI",
-        token_no: "0xNO_CPI",
-        active_strategy: null,
-        pnl_total: -1.12,
-        fees_paid: 0.10,
-        position_count: 1,
-      },
-    ];
-
-    setDemoMarkets(initial);
-
-    // Smoothly wiggle PnL / positions so charts and stats move
-    const interval = setInterval(() => {
-      setDemoMarkets((prev) => {
-        if (!prev) return prev;
-        return prev.map((m) => {
-          // Small random walk for PnL and positions only for active markets
-          if (m.status !== "active") return m;
-
-          const deltaPnl = (Math.random() - 0.5) * 0.8; // between -0.4 and +0.4
-          const deltaFees = Math.random() * 0.02;
-          const deltaPos = Math.random() > 0.5 ? 1 : 0;
-
-          const nextPnl = (m.pnl_total ?? 0) + deltaPnl;
-          const nextFees = (m.fees_paid ?? 0) + deltaFees;
-          const nextPos = m.position_count + deltaPos;
-
-          return {
-            ...m,
-            pnl_total: Number(nextPnl.toFixed(2)),
-            fees_paid: Number(nextFees.toFixed(4)),
-            position_count: nextPos,
-          };
-        });
-      });
-    }, 3_000); // every 3 seconds
-
-    return () => clearInterval(interval);
-  }, [DEMO_MODE]);
-
-  // Decide which markets to show – in demo mode we ignore backend data
-  const markets: Market[] = DEMO_MODE ? (demoMarkets ?? []) : (data ?? []);
-
   const onRefresh = useCallback(() => {
     if (viewMode === "database") {
-      if (!DEMO_MODE) {
-        mutate();
-      } else {
-        // In demo mode, just nudge the animation once
-        setDemoMarkets((prev) =>
-          prev?.map((m) =>
-            m.status === "active"
-              ? {
-                  ...m,
-                  pnl_total: Number(((m.pnl_total ?? 0) + (Math.random() - 0.4)).toFixed(2)),
-                  position_count: m.position_count + (Math.random() > 0.6 ? 1 : 0),
-                }
-              : m,
-          ) ?? prev,
-        );
-      }
+      mutate();
     } else {
       mutateLive();
     }
-  }, [DEMO_MODE, mutate, mutateLive, viewMode]);
+  }, [mutate, mutateLive, viewMode]);
 
   const handleToggleMarket = useCallback(async (market: Market) => {
-    if (DEMO_MODE) {
-      // Front‑end only toggling for screenshots – pretend bot is starting/stopping
-      setDemoMarkets((prev) =>
-        prev?.map((m) =>
-          m.id === market.id
-            ? {
-                ...m,
-                status: m.status === "active" ? "inactive" : "active",
-              }
-            : m,
-        ) ?? prev,
-      );
-      return;
-    }
-
     if (loadingMarkets.has(market.id)) return;
     
     setLoadingMarkets(prev => new Set(prev).add(market.id));
@@ -179,7 +61,7 @@ export default function HomePage() {
         return next;
       });
     }
-  }, [DEMO_MODE, loadingMarkets, mutate]);
+  }, [loadingMarkets, mutate]);
 
   return (
     <main className="space-y-6">
@@ -229,10 +111,10 @@ export default function HomePage() {
         </div>
       </header>
 
-      {viewMode === "database" && markets && markets.length > 0 ? (
+      {viewMode === "database" && data && data.length > 0 ? (
         <>
-          <DashboardStats markets={markets} />
-          <PnLChart markets={markets} />
+          <DashboardStats markets={data} />
+          <PnLChart markets={data} />
         </>
       ) : null}
 
@@ -256,15 +138,15 @@ export default function HomePage() {
               </div>
             )}
 
-            {markets && markets.length === 0 && (
+            {data && data.length === 0 && (
               <div className="rounded-md border border-slate-700 bg-slate-900 px-4 py-6 text-center text-sm text-slate-400">
                 No markets found. Ensure the backend sync has populated the database.
               </div>
             )}
 
-            {markets && markets.length > 0 && (
+            {data && data.length > 0 && (
               <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {markets.map((market) => (
+                {data.map((market) => (
             <article
               key={market.id}
               className="group flex flex-col rounded-lg border border-slate-800 bg-slate-900/60 p-5 shadow-lg transition-all hover:border-slate-700 hover:bg-slate-900/80"
