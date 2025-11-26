@@ -57,6 +57,29 @@ class PolymarketClient:
         if not browser_address:
             raise ValueError("BROWSER_ADDRESS environment variable is not set! Bot cannot identify wallet.")
         
+        # Validate and clean private key format
+        key = key.strip()
+        # Remove 0x prefix if present (ClobClient expects key without 0x)
+        if key.startswith('0x') or key.startswith('0X'):
+            key = key[2:]
+            print(f"WARNING: Removed '0x' prefix from private key")
+        
+        # Validate private key length (should be 64 hex characters)
+        if len(key) != 64:
+            raise ValueError(
+                f"Invalid private key length! Expected 64 hex characters (without 0x), "
+                f"got {len(key)}. Check your PK in .env file."
+            )
+        
+        # Validate it's hex
+        try:
+            int(key, 16)
+        except ValueError:
+            raise ValueError(
+                f"Invalid private key format! Must be hexadecimal (0-9, a-f). "
+                f"Check your PK in .env file."
+            )
+        
         # Clean up browser_address - remove any duplicates or extra characters
         browser_address = browser_address.strip()
         # If address appears duplicated, take the first occurrence
@@ -162,8 +185,10 @@ class PolymarketClient:
             resp = self.client.post_order(signed_order)
             return resp
         except Exception as ex:
-            print(ex)
-            return {}
+            error_str = str(ex)
+            print(f"ERROR in create_order: {error_str}")
+            # Re-raise the exception so caller can handle it
+            raise
 
     def get_order_book(self, market):
         """

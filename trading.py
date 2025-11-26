@@ -426,19 +426,39 @@ async def perform_trade(market):
                     
                     # Bypass send_buy_order and call create_order directly
                     try:
-                        client.create_order(
+                        result = client.create_order(
                             token,
                             'BUY',
                             test_price,
                             test_size,
                             True if row['neg_risk'] == 'TRUE' else False
                         )
-                        global_state.test_order_placed = True
-                        print(f"✅ TEST ORDER PLACED SUCCESSFULLY!")
+                        # Check if order was actually placed (result should not be empty)
+                        if result and isinstance(result, dict) and len(result) > 0:
+                            global_state.test_order_placed = True
+                            print(f"✅ TEST ORDER PLACED SUCCESSFULLY!")
+                            print(f"Order response: {result}")
+                        else:
+                            print(f"❌ ORDER FAILED: create_order returned empty result")
+                            print(f"This usually means 'invalid signature' - check:")
+                            print(f"  1. Private key (PK) format is correct (no 0x prefix)")
+                            print(f"  2. Wallet has done at least ONE manual trade on Polymarket")
+                            print(f"  3. Wallet has USDC balance on Polygon")
+                            global_state.test_order_placed = True  # Still set flag to prevent retries
                     except Exception as e:
-                        print(f"❌ ERROR placing test order: {e}")
+                        error_msg = str(e)
+                        print(f"❌ ERROR placing test order: {error_msg}")
+                        if "invalid signature" in error_msg.lower():
+                            print(f"\n{'='*60}")
+                            print(f"INVALID SIGNATURE ERROR - Common causes:")
+                            print(f"1. Private key (PK) must be WITHOUT '0x' prefix")
+                            print(f"2. Wallet must have done at least ONE manual trade on Polymarket")
+                            print(f"3. Check PK format: should be 64 hex characters (no 0x)")
+                            print(f"4. Wallet address must match the wallet that did manual trade")
+                            print(f"{'='*60}\n")
                         import traceback
                         traceback.print_exc()
+                        global_state.test_order_placed = True  # Still set flag to prevent retries
                 
                 # ------- NORMAL BUY ORDER LOGIC (after test order) -------
                 # Get max_size, defaulting to trade_size if not specified or NaN
