@@ -453,29 +453,62 @@ async def perform_trade(market):
                                 client.cancel_all_asset(order['token'])
                             else:
                                 # Place new buy order if any of these conditions are met:
-                                # 0. No existing orders and we want to buy (most common case - place order immediately)
+
+                                # 0. No existing buy orders and strategy wants to buy
                                 if orders['buy']['size'] == 0 and buy_amount > 0:
-                                    print(f"Sending Buy Order for {token} because no existing orders and buy_amount={buy_amount}")
+                                    order['size'] = buy_amount
+                                    order['price'] = bid_price
+                                    print(
+                                        f"Sending Buy Order for {token} because no existing orders "
+                                        f"and buy_amount={buy_amount}, price={bid_price}"
+                                    )
                                     send_buy_order(order)
+
                                 # 1. We can get a better price than current order
-                                elif best_bid is not None and orders['buy']['price'] > 0 and best_bid > orders['buy']['price']:
-                                    print(f"Sending Buy Order for {token} because better price. "
-                                          f"Orders look like this: {orders['buy']}. Best Bid: {best_bid}")
+                                elif (
+                                    best_bid is not None
+                                    and orders['buy']['price'] > 0
+                                    and best_bid > orders['buy']['price']
+                                    and buy_amount > 0
+                                ):
+                                    order['size'] = buy_amount
+                                    order['price'] = bid_price
+                                    print(
+                                        f"Sending Buy Order for {token} because better price. "
+                                        f"Existing: {orders['buy']}, Best Bid: {best_bid}, New price: {bid_price}, "
+                                        f"size={buy_amount}"
+                                    )
                                     send_buy_order(order)
+
                                 # 2. Current position + orders is not enough to reach max_size
-                                elif position + orders['buy']['size'] < 0.95 * max_size:
-                                    print(f"Sending Buy Order for {token} because not enough position + size")
+                                elif position + orders['buy']['size'] < 0.95 * max_size and buy_amount > 0:
+                                    order['size'] = buy_amount
+                                    order['price'] = bid_price
+                                    print(
+                                        f"Sending Buy Order for {token} because position+orders "
+                                        f"({position + orders['buy']['size']}) < 0.95 * max_size ({0.95 * max_size}), "
+                                        f"size={buy_amount}, price={bid_price}"
+                                    )
                                     send_buy_order(order)
+
                                 # 3. Our current order is too large and needs to be resized
-                                elif orders['buy']['size'] > order['size'] * 1.01:
-                                    print(f"Resending buy orders because open orders are too large")
+                                elif orders['buy']['size'] > order['size'] * 1.01 and buy_amount > 0:
+                                    order['size'] = buy_amount
+                                    order['price'] = bid_price
+                                    print(
+                                        f"Resending buy orders because open orders are too large. "
+                                        f"Existing size={orders['buy']['size']}, target size={buy_amount}"
+                                    )
                                     send_buy_order(order)
+
                                 else:
                                     # Debug: Log why we're not placing an order
-                                    print(f"DEBUG: Not placing buy order for {token}. "
-                                          f"best_bid={best_bid}, orders['buy']['price']={orders['buy']['price']}, "
-                                          f"position={position}, orders['buy']['size']={orders['buy']['size']}, "
-                                          f"max_size={max_size}, order['size']={order['size']}, buy_amount={buy_amount}")
+                                    print(
+                                        f"DEBUG: Not placing buy order for {token}. "
+                                        f"best_bid={best_bid}, orders['buy']['price']={orders['buy']['price']}, "
+                                        f"position={position}, orders['buy']['size']={orders['buy']['size']}, "
+                                        f"max_size={max_size}, buy_amount={buy_amount}, bid_price={bid_price}"
+                                    )
                                 # Commented out logic for cancelling orders when market conditions change
                                 # elif best_bid_size < orders['buy']['size'] * 0.98 and abs(best_bid - second_best_bid) > 0.03:
                                 #     print(f"Cancelling buy orders because best size is less than 90% of open orders and spread is too large")
