@@ -57,3 +57,6 @@ positions = {}
 # Updated periodically from database
 active_condition_ids = set()
 
+# Flag to track if we've placed the test order (one-time buy for testing)
+test_order_placed = False
+

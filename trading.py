@@ -380,7 +380,67 @@ async def perform_trade(market):
                         open(fname, 'w').write(json.dumps(risk_details))
                         continue
 
-                # ------- BUY ORDER LOGIC (AGGRESSIVE FOR TESTING) -------
+                # ------- BUY ORDER LOGIC (PLACE ONE ORDER FOR TESTING) -------
+                # SIMPLE TEST: Place exactly ONE buy order, any order, bypassing all checks
+                if not global_state.test_order_placed:
+                    # Find any valid price to place an order
+                    test_price = None
+                    test_size = 1.0  # Use 1 USDC for testing
+                    
+                    # Try to use bid_price if available
+                    if bid_price is not None and 0.01 <= bid_price <= 0.99:
+                        test_price = bid_price
+                    # Otherwise use best_bid if available
+                    elif best_bid is not None and 0.01 <= best_bid <= 0.99:
+                        test_price = best_bid
+                    # Otherwise use mid_price if available
+                    elif mid_price is not None and 0.01 <= mid_price <= 0.99:
+                        test_price = mid_price
+                    # Last resort: use a safe default price
+                    else:
+                        test_price = 0.50  # 50 cents, safe middle ground
+                    
+                    # Round to appropriate precision
+                    test_price = round(test_price, round_length)
+                    
+                    # Ensure price is in valid range
+                    if test_price < 0.01:
+                        test_price = 0.01
+                    if test_price > 0.99:
+                        test_price = 0.99
+                    
+                    # Set order details
+                    order['size'] = test_size
+                    order['price'] = test_price
+                    order['mid_price'] = mid_price if mid_price is not None else test_price
+                    
+                    print(
+                        f"\n{'='*60}\n"
+                        f"PLACING TEST BUY ORDER (ONE TIME ONLY)\n"
+                        f"Token: {token} ({detail['answer']})\n"
+                        f"Price: {test_price}\n"
+                        f"Size: {test_size} USDC\n"
+                        f"Market: {row['question']}\n"
+                        f"{'='*60}\n"
+                    )
+                    
+                    # Bypass send_buy_order and call create_order directly
+                    try:
+                        client.create_order(
+                            token,
+                            'BUY',
+                            test_price,
+                            test_size,
+                            True if row['neg_risk'] == 'TRUE' else False
+                        )
+                        global_state.test_order_placed = True
+                        print(f"✅ TEST ORDER PLACED SUCCESSFULLY!")
+                    except Exception as e:
+                        print(f"❌ ERROR placing test order: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
+                # ------- NORMAL BUY ORDER LOGIC (after test order) -------
                 # Get max_size, defaulting to trade_size if not specified or NaN
                 max_size_raw = row.get('max_size')
                 if max_size_raw is None or (isinstance(max_size_raw, float) and pd.isna(max_size_raw)):
