@@ -57,6 +57,23 @@ class PolymarketClient:
         if not browser_address:
             raise ValueError("BROWSER_ADDRESS environment variable is not set! Bot cannot identify wallet.")
         
+        # Clean up browser_address - remove any duplicates or extra characters
+        browser_address = browser_address.strip()
+        # If address appears duplicated, take the first occurrence
+        if browser_address.startswith('0x') and len(browser_address) > 42:
+            # Check if it's duplicated (should be 42 chars: 0x + 40 hex)
+            expected_length = 42
+            if len(browser_address) >= expected_length * 2:
+                # Likely duplicated, take first part
+                browser_address = browser_address[:expected_length]
+                print(f"WARNING: BROWSER_ADDRESS appears duplicated, using first part only")
+        
+        # Validate address format
+        if not browser_address.startswith('0x'):
+            raise ValueError(f"BROWSER_ADDRESS must start with '0x'. Got: {browser_address[:20]}...")
+        if len(browser_address) != 42:
+            raise ValueError(f"BROWSER_ADDRESS must be 42 characters (0x + 40 hex). Got {len(browser_address)} characters: {browser_address[:20]}...")
+        
         print("Initializing Polymarket client...")
         print(f"Wallet address: {browser_address[:10]}...{browser_address[-8:]}")
         chain_id=POLYGON
@@ -64,7 +81,7 @@ class PolymarketClient:
         try:
             self.browser_wallet=Web3.to_checksum_address(browser_address)
         except Exception as e:
-            raise ValueError(f"Invalid BROWSER_ADDRESS format: {e}")
+            raise ValueError(f"Invalid BROWSER_ADDRESS format: {e}. Address: {browser_address[:20]}...")
 
         # Initialize the Polymarket API client
         self.client = ClobClient(
