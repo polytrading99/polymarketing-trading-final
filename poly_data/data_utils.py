@@ -164,14 +164,69 @@ def set_order(token, side, size, price):
 
     
 
+def update_active_markets():
+    """
+    Check database for active markets with running bots.
+    Updates global_state.active_condition_ids.
+    """
+    try:
+        import asyncio
+        from app.database.session import get_session
+        from app.database.models import Market, BotRun
+        from sqlalchemy import select, text
+        
+        async def _fetch_active():
+            async with get_session() as session:
+                # Get condition_ids of markets with running bots
+                stmt = (
+                    select(Market.condition_id)
+                    .join(BotRun, BotRun.market_id == Market.id)
+                    .where(
+                        Market.status == "active",
+                        text("CAST(bot_run.status AS TEXT) = 'running'")
+                    )
+                )
+                result = await session.execute(stmt)
+                condition_ids = {row[0] for row in result.all()}
+                return condition_ids
+        
+        # Handle async call from sync context
+        try:
+            loop = asyncio.get_running_loop()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(lambda: asyncio.run(_fetch_active()))
+                active_ids = future.result(timeout=5)
+        except RuntimeError:
+            active_ids = asyncio.run(_fetch_active())
+        
+        global_state.active_condition_ids = active_ids
+        print(f"Updated active markets: {len(active_ids)} markets with running bots")
+        if active_ids:
+            print(f"Active condition_ids: {list(active_ids)[:5]}...")  # Show first 5
+    except Exception as e:
+        print(f"Failed to update active markets from database: {e}")
+        # Don't clear active_condition_ids on error, keep previous state
+
 def update_markets():
     received_df, received_params = get_sheet_df()
 
     if len(received_df) > 0:
         global_state.df, global_state.params = received_df.copy(), received_params
     
+    # Update active markets from database
+    update_active_markets()
 
+    # Clear and rebuild all_tokens, but only for active markets
+    global_state.all_tokens = []
+    
     for _, row in global_state.df.iterrows():
+        condition_id = row.get('condition_id')
+        
+        # Only process markets that are active (have running bot)
+        if condition_id and condition_id not in global_state.active_condition_ids:
+            continue  # Skip inactive markets
+        
         for col in ['token1', 'token2']:
             row[col] = str(row[col])
 
@@ -190,3 +245,5 @@ def update_markets():
         for col2 in [f"{row['token1']}_buy", f"{row['token1']}_sell", f"{row['token2']}_buy", f"{row['token2']}_sell"]:
             if col2 not in global_state.performing:
                 global_state.performing[col2] = set()
+    
+    print(f"Subscribing to {len(global_state.all_tokens)} tokens from {len(global_state.active_condition_ids)} active markets")

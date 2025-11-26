@@ -141,8 +141,13 @@ async def perform_trade(market):
     4. Implements risk management with stop-loss and take-profit logic
     
     Args:
-        market (str): The market ID to trade on
+        market (str): The market ID (condition_id) to trade on
     """
+    # Check if this market is active (has running bot)
+    if market not in global_state.active_condition_ids:
+        # Market is not active, skip trading
+        return
+    
     # Create a lock for this market if it doesn't exist
     if market not in market_locks:
         market_locks[market] = asyncio.Lock()

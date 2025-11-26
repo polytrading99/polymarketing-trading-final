@@ -50,3 +50,7 @@ orders = {}
 # Format: {token_id: {'size': float, 'avgPrice': float}}
 positions = {}
 
+# Set of active condition_ids (markets that should be traded)
+# Updated periodically from database
+active_condition_ids = set()
+
