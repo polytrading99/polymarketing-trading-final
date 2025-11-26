@@ -265,14 +265,25 @@ def update_markets():
     if len(received_df) > 0:
         global_state.df, global_state.params = received_df.copy(), received_params
     
-    # Extract condition_ids from the loaded markets (they're already filtered for active + running bots)
-    # This is more reliable than a separate query
+    # Only extract condition_ids if we have a reasonable number of markets (likely from database)
+    # Google Sheets has ~2607 markets, database should have only active ones (typically 1-10)
+    # If we have more than 100 markets, it's probably Google Sheets fallback - use separate query instead
     if global_state.df is not None and 'condition_id' in global_state.df.columns:
-        active_condition_ids = set(global_state.df['condition_id'].dropna().unique())
-        global_state.active_condition_ids = active_condition_ids
-        print(f"Updated active markets from loaded config: {len(active_condition_ids)} markets with running bots")
-        if active_condition_ids:
-            print(f"Active condition_ids: {list(active_condition_ids)[:5]}...")  # Show first 5
+        num_markets = len(global_state.df)
+        
+        # If we have a small number of markets (< 100), assume they're from database (active markets only)
+        # Extract condition_ids directly
+        if num_markets < 100:
+            active_condition_ids = set(global_state.df['condition_id'].dropna().unique())
+            global_state.active_condition_ids = active_condition_ids
+            print(f"Updated active markets from loaded config: {len(active_condition_ids)} markets with running bots")
+            if active_condition_ids:
+                print(f"Active condition_ids: {list(active_condition_ids)[:5]}...")  # Show first 5
+        else:
+            # Too many markets = probably Google Sheets fallback
+            # Use separate query to get only active markets from database
+            print(f"Detected Google Sheets fallback ({num_markets} markets), querying database for active markets only")
+            update_active_markets()
     else:
         # Fallback: try the separate query if df doesn't have condition_ids
         update_active_markets()
