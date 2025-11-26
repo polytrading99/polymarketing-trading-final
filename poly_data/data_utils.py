@@ -265,14 +265,13 @@ def update_markets():
     if len(received_df) > 0:
         global_state.df, global_state.params = received_df.copy(), received_params
     
-    # Only extract condition_ids if we have a reasonable number of markets (likely from database)
-    # Google Sheets has ~2607 markets, database should have only active ones (typically 1-10)
-    # If we have more than 100 markets, it's probably Google Sheets fallback - use separate query instead
+    # Extract condition_ids from loaded markets
+    # If from database: will have only active markets (typically 1-10)
+    # If from Google Sheets: will have all markets (~2607) - we'll filter by checking database separately
     if global_state.df is not None and 'condition_id' in global_state.df.columns:
         num_markets = len(global_state.df)
         
-        # If we have a small number of markets (< 100), assume they're from database (active markets only)
-        # Extract condition_ids directly
+        # If we have a small number of markets (< 100), they're from database - use them directly
         if num_markets < 100:
             active_condition_ids = set(global_state.df['condition_id'].dropna().unique())
             global_state.active_condition_ids = active_condition_ids
@@ -280,13 +279,15 @@ def update_markets():
             if active_condition_ids:
                 print(f"Active condition_ids: {list(active_condition_ids)[:5]}...")  # Show first 5
         else:
-            # Too many markets = probably Google Sheets fallback
-            # Use separate query to get only active markets from database
-            print(f"Detected Google Sheets fallback ({num_markets} markets), querying database for active markets only")
-            update_active_markets()
+            # Too many markets = Google Sheets fallback
+            # Don't query database (causes conflicts) - just keep previous active_condition_ids
+            # The bot will only trade markets that are in both the dataframe AND active_condition_ids
+            print(f"Google Sheets fallback detected ({num_markets} markets). Keeping previous active markets.")
+            if len(global_state.active_condition_ids) == 0:
+                print("WARNING: No active markets cached. Bot will not trade until database query succeeds.")
     else:
-        # Fallback: try the separate query if df doesn't have condition_ids
-        update_active_markets()
+        # No condition_ids in dataframe - keep previous state
+        print("No condition_ids in dataframe, keeping previous active markets")
 
     # Clear and rebuild all_tokens, but only for active markets
     global_state.all_tokens = []
