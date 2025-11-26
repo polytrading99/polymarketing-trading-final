@@ -171,9 +171,8 @@ def update_active_markets():
     Uses a lock to prevent concurrent database operations.
     """
     # Use lock to prevent concurrent database operations
-    if not global_state.db_lock.acquire(blocking=False):
-        print("Database query already in progress, skipping this cycle")
-        return
+    # Wait for other operations to finish (blocking=True) so we always get the query done
+    global_state.db_lock.acquire(blocking=True, timeout=30)
     
     try:
         import asyncio
