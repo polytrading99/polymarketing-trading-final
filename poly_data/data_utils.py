@@ -222,29 +222,9 @@ def update_active_markets():
                 # Fall through to fallback
                 active_ids = set()
         
-        # If async query failed, try direct SQL query as fallback
-        if not active_ids:
-            try:
-                import subprocess
-                print("Trying direct SQL fallback query...")
-                result = subprocess.run(
-                    [
-                        "docker", "compose", "exec", "-T", "postgres",
-                        "psql", "-U", "poly", "-d", "poly", "-t", "-A",
-                        "-c", "SELECT m.condition_id FROM market m JOIN bot_run br ON m.id = br.market_id WHERE m.status = 'active' AND CAST(br.status AS TEXT) = 'running';"
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    cwd="/app"  # Run from app directory
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    active_ids = {line.strip() for line in result.stdout.strip().split('\n') if line.strip()}
-                    print(f"Fallback SQL query succeeded: {len(active_ids)} active markets")
-                else:
-                    print(f"Fallback SQL query returned no results or error")
-            except Exception as fallback_error:
-                print(f"Fallback SQL query also failed: {fallback_error}")
+        # If async query failed, the error was already logged
+        # We'll keep the previous active_condition_ids and retry on next cycle
+        # This prevents clearing active markets on transient connection errors
         
         global_state.active_condition_ids = active_ids
         print(f"Updated active markets: {len(active_ids)} markets with running bots")
