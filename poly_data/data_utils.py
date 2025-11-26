@@ -216,29 +216,38 @@ def update_active_markets():
             try:
                 active_ids = future.result(timeout=10)
             except concurrent.futures.TimeoutError:
-                print("Timeout waiting for active markets query, trying fallback")
+                print("Timeout waiting for active markets query")
                 active_ids = set()
-            except Exception:
-                # Fall through to fallback
+            except Exception as e:
+                error_msg = str(e)
+                if "another operation is in progress" in error_msg:
+                    print(f"Database operation conflict detected, will retry on next cycle")
+                else:
+                    print(f"Database query error: {e}")
                 active_ids = set()
         
         # If async query failed, the error was already logged
         # We'll keep the previous active_condition_ids and retry on next cycle
         # This prevents clearing active markets on transient connection errors
         
-        global_state.active_condition_ids = active_ids
-        print(f"Updated active markets: {len(active_ids)} markets with running bots")
-        if active_ids:
-            print(f"Active condition_ids: {list(active_ids)[:5]}...")  # Show first 5
-        elif len(active_ids) == 0:
-            print("WARNING: No active markets found. Make sure:")
-            print("  1. At least one market has status='active' in database")
-            print("  2. At least one bot_run has status='running' for that market")
+        # Only update if query succeeded (even if result is empty)
+        # On error, keep previous state to avoid clearing active markets
+        if 'active_ids' in locals():
+            global_state.active_condition_ids = active_ids
+            print(f"Updated active markets: {len(active_ids)} markets with running bots")
+            if active_ids:
+                print(f"Active condition_ids: {list(active_ids)[:5]}...")  # Show first 5
+            elif len(active_ids) == 0:
+                print("WARNING: No active markets found. Make sure:")
+                print("  1. At least one market has status='active' in database")
+                print("  2. At least one bot_run has status='running' for that market")
+                print("  3. Check with: ./check_why_no_active_markets.sh")
+        else:
+            print("Query failed, keeping previous active_condition_ids")
     except Exception as e:
         print(f"Failed to update active markets from database: {e}")
-        import traceback
-        traceback.print_exc()
         # Don't clear active_condition_ids on error, keep previous state
+        print("Keeping previous active_condition_ids due to error")
 
 def update_markets():
     received_df, received_params = get_sheet_df()
