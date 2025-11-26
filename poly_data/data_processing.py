@@ -94,8 +94,24 @@ def remove_from_performing(col, id):
         global_state.performing_timestamps[col].pop(id, None)
 
 def process_user_data(rows):
+    # Handle different input types
+    if not isinstance(rows, (list, dict)):
+        print(f"process_user_data received invalid type: {type(rows)}, value: {str(rows)[:100]}")
+        return
+    
+    # Convert single dict to list
+    if isinstance(rows, dict):
+        rows = [rows]
 
     for row in rows:
+        if not isinstance(row, dict):
+            print(f"Skipping invalid row type in process_user_data: {type(row)}, value: {str(row)[:100]}")
+            continue
+            
+        if 'market' not in row:
+            print(f"Missing 'market' key in user data: {list(row.keys())}")
+            continue
+            
         market = row['market']
 
         side = row['side'].lower()

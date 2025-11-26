@@ -94,9 +94,28 @@ async def connect_user_websocket():
             # Process incoming user data indefinitely
             while True:
                 message = await websocket.recv()
-                json_data = json.loads(message)
-                # Process trade and order updates
-                process_user_data(json_data)
+                try:
+                    json_data = json.loads(message)
+                    # Handle different data formats
+                    if isinstance(json_data, str):
+                        # Sometimes we get just a string (token ID or hash)
+                        print(f"Received string from user websocket (likely token/hash): {json_data[:50]}")
+                        continue
+                    elif isinstance(json_data, dict):
+                        # Single event - wrap in list
+                        process_user_data([json_data])
+                    elif isinstance(json_data, list):
+                        # List of events
+                        process_user_data(json_data)
+                    else:
+                        print(f"Unexpected data type from user websocket: {type(json_data)}")
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse JSON from user websocket: {e}, message: {message[:100]}")
+                except Exception as e:
+                    print(f"Error processing user websocket message: {e}")
+                    print(f"Message type: {type(message)}, Message preview: {str(message)[:100]}")
+                    import traceback
+                    traceback.print_exc()
         except websockets.ConnectionClosed:
             print("Connection closed in user websocket")
             print(traceback.format_exc())
