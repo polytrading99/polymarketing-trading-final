@@ -17,19 +17,25 @@ def pretty_print(txt, dic):
 
 def _load_snapshot() -> BotConfigSnapshot:
     async def _load() -> BotConfigSnapshot:
-        provider = DatabaseConfigProvider()
+        # Use database lock to prevent conflicts with other DB operations
+        import poly_data.global_state as global_state
+        global_state.db_lock.acquire(blocking=True, timeout=30)
         try:
-            # Load only active markets from database
-            from app.config.repository import ConfigRepository
-            repo = ConfigRepository()
-            config = await repo.load_configuration(active_only=True)
-            from app.config.repository import to_snapshot
-            snapshot = to_snapshot(config)
-            if snapshot.markets:
-                print(f"Loaded {len(snapshot.markets)} active markets from database")
-                return snapshot
-        except Exception as exc:
-            print(f"Database configuration load failed: {exc}. Falling back to Google Sheets.")
+            provider = DatabaseConfigProvider()
+            try:
+                # Load only active markets from database
+                from app.config.repository import ConfigRepository
+                repo = ConfigRepository()
+                config = await repo.load_configuration(active_only=True)
+                from app.config.repository import to_snapshot
+                snapshot = to_snapshot(config)
+                if snapshot.markets:
+                    print(f"Loaded {len(snapshot.markets)} active markets from database")
+                    return snapshot
+            except Exception as exc:
+                print(f"Database configuration load failed: {exc}. Falling back to Google Sheets.")
+        finally:
+            global_state.db_lock.release()
 
         sheet_provider = GoogleSheetConfigProvider()
         snapshot = await sheet_provider.fetch()
