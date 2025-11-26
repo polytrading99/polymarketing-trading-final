@@ -176,19 +176,28 @@ def update_active_markets():
         from sqlalchemy import select, text
         
         async def _fetch_active():
-            async with get_session() as session:
-                # Get condition_ids of markets with running bots
-                stmt = (
-                    select(Market.condition_id)
-                    .join(BotRun, BotRun.market_id == Market.id)
-                    .where(
-                        Market.status == "active",
-                        text("CAST(bot_run.status AS TEXT) = 'running'")
+            try:
+                async with get_session() as session:
+                    # Get condition_ids of markets with running bots
+                    stmt = (
+                        select(Market.condition_id)
+                        .join(BotRun, BotRun.market_id == Market.id)
+                        .where(
+                            Market.status == "active",
+                            text("CAST(bot_run.status AS TEXT) = 'running'")
+                        )
                     )
-                )
-                result = await session.execute(stmt)
-                condition_ids = {row[0] for row in result.all()}
-                return condition_ids
+                    result = await session.execute(stmt)
+                    condition_ids = {row[0] for row in result.all()}
+                    return condition_ids
+            except Exception as db_error:
+                # Handle connection errors gracefully
+                error_msg = str(db_error)
+                if "ConnectionClosedError" in error_msg or "websocket" in error_msg.lower():
+                    print(f"Database connection closed, will retry on next update")
+                else:
+                    print(f"Database query error: {db_error}")
+                return set()
         
         # Always create a new event loop to avoid conflicts with existing async operations
         import concurrent.futures
