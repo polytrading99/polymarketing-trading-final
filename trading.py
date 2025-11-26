@@ -443,8 +443,12 @@ async def perform_trade(market):
                                 client.cancel_all_asset(order['token'])
                             else:
                                 # Place new buy order if any of these conditions are met:
+                                # 0. No existing orders and we want to buy (most common case - place order immediately)
+                                if orders['buy']['size'] == 0 and buy_amount > 0:
+                                    print(f"Sending Buy Order for {token} because no existing orders and buy_amount={buy_amount}")
+                                    send_buy_order(order)
                                 # 1. We can get a better price than current order
-                                if best_bid > orders['buy']['price']:
+                                elif best_bid is not None and orders['buy']['price'] > 0 and best_bid > orders['buy']['price']:
                                     print(f"Sending Buy Order for {token} because better price. "
                                           f"Orders look like this: {orders['buy']}. Best Bid: {best_bid}")
                                     send_buy_order(order)
@@ -461,7 +465,7 @@ async def perform_trade(market):
                                     print(f"DEBUG: Not placing buy order for {token}. "
                                           f"best_bid={best_bid}, orders['buy']['price']={orders['buy']['price']}, "
                                           f"position={position}, orders['buy']['size']={orders['buy']['size']}, "
-                                          f"max_size={max_size}, order['size']={order['size']}")
+                                          f"max_size={max_size}, order['size']={order['size']}, buy_amount={buy_amount}")
                                 # Commented out logic for cancelling orders when market conditions change
                                 # elif best_bid_size < orders['buy']['size'] * 0.98 and abs(best_bid - second_best_bid) > 0.03:
                                 #     print(f"Cancelling buy orders because best size is less than 90% of open orders and spread is too large")
