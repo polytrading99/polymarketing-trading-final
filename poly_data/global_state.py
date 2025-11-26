@@ -29,6 +29,9 @@ params = {}
 # Lock for thread-safe trading operations
 lock = threading.Lock()
 
+# Lock for database operations to prevent concurrent access conflicts
+db_lock = threading.Lock()
+
 # ============ Trading State ============
 
 # Tracks trades that have been matched but not yet mined

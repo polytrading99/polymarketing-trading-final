@@ -168,7 +168,13 @@ def update_active_markets():
     """
     Check database for active markets with running bots.
     Updates global_state.active_condition_ids.
+    Uses a lock to prevent concurrent database operations.
     """
+    # Use lock to prevent concurrent database operations
+    if not global_state.db_lock.acquire(blocking=False):
+        print("Database query already in progress, skipping this cycle")
+        return
+    
     try:
         import asyncio
         from app.database.session import get_session
@@ -248,6 +254,9 @@ def update_active_markets():
         print(f"Failed to update active markets from database: {e}")
         # Don't clear active_condition_ids on error, keep previous state
         print("Keeping previous active_condition_ids due to error")
+    finally:
+        # Always release the lock
+        global_state.db_lock.release()
 
 def update_markets():
     received_df, received_params = get_sheet_df()
