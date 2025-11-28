@@ -124,21 +124,34 @@ try:
         "type": "function"
     }]
     
+    print(f"   Checking balance for: {browser_address_checksum}")
+    print(f"   USDC Contract: {usdc_address}")
+    
     usdc_contract = web3.eth.contract(address=usdc_address, abi=erc20_abi)
     balance = usdc_contract.functions.balanceOf(browser_address_checksum).call()
     balance_usdc = balance / 10**6  # USDC has 6 decimals
     
+    print(f"   Raw balance (wei): {balance}")
     print(f"✅ USDC Balance: {balance_usdc:.2f} USDC")
     
     if balance_usdc < 1.0:
-        print(f"⚠️  WARNING: Low USDC balance ({balance_usdc:.2f} USDC)")
+        print(f"\n⚠️  WARNING: Low USDC balance ({balance_usdc:.2f} USDC)")
         print(f"   You need at least 1-2 USDC for testing")
+        print(f"\n   If you see USDC in Polymarket but not here:")
+        print(f"   - The wallet address might be different")
+        print(f"   - Check which wallet address you're using on Polymarket")
+        print(f"   - Compare it with: {browser_address_checksum}")
     else:
         print(f"✅ Sufficient USDC balance for trading")
         
 except Exception as e:
-    print(f"⚠️  Could not check USDC balance: {e}")
-    print(f"   (This is not critical, but you should have USDC to trade)")
+    print(f"❌ ERROR checking USDC balance: {e}")
+    import traceback
+    traceback.print_exc()
+    print(f"\n   This might indicate:")
+    print(f"   - Network connectivity issues")
+    print(f"   - Wrong wallet address")
+    print(f"   - RPC endpoint issues")
 
 # ========== 6. POLYMARKET CLIENT INITIALIZATION ==========
 print("\n[6] Testing Polymarket Client Initialization...")
@@ -169,19 +182,25 @@ print("\n[7] Checking Manual Trade Status...")
 print("-" * 70)
 print("⚠️  IMPORTANT: Polymarket requires at least ONE manual trade")
 print("   through their UI before API trading works.")
-print("\n   To verify you did a manual trade:")
+print(f"\n   CRITICAL: Verify the wallet address matches!")
+print(f"   Bot is configured to use: {browser_address_checksum}")
+print(f"\n   To verify you did a manual trade with THIS wallet:")
 print(f"   1. Go to https://polymarket.com")
-print(f"   2. Connect wallet: {browser_address_checksum}")
-print(f"   3. Check your trade history:")
+print(f"   2. Connect wallet and check the address shown")
+print(f"   3. Compare it with: {browser_address_checksum}")
+print(f"   4. If addresses DON'T match, that's the problem!")
+print(f"      - Either update BROWSER_ADDRESS in .env")
+print(f"      - Or use the wallet that matches {browser_address_checksum}")
+print(f"\n   5. Check your trade history:")
 print(f"      - Click your profile/wallet icon")
 print(f"      - Look for 'Trades' or 'History'")
 print(f"      - You should see at least one completed trade")
-print(f"\n   4. If you don't see any trades, make one now:")
+print(f"\n   6. If no trades visible, make one now:")
 print(f"      - Pick any market")
 print(f"      - Buy or sell any amount (even $0.10)")
 print(f"      - Complete the transaction")
 print(f"      - Wait for it to confirm on Polygon")
-print(f"      - Wait 1-2 minutes for permissions to propagate")
+print(f"      - Wait 2-3 minutes for permissions to propagate")
 
 # ========== 8. TEST ORDER CREATION ==========
 print("\n[8] Testing Order Signature Creation...")
