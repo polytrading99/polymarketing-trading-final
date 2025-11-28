@@ -382,6 +382,7 @@ async def perform_trade(market):
 
                 # ------- BUY ORDER LOGIC (PLACE ONE ORDER FOR TESTING) -------
                 # SIMPLE TEST: Place exactly ONE buy order, any order, bypassing all checks
+                # Note: Set test_order_placed = False in global_state.py to reset and try again
                 if not global_state.test_order_placed:
                     # Find any valid price to place an order
                     test_price = None
