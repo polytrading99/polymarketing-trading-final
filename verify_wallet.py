@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
 Diagnostic script to verify wallet setup and identify signature issues.
+Run this inside the Docker container: docker compose exec worker python /app/verify_wallet.py
 """
 import os
-from dotenv import load_dotenv
+import sys
+
+# Try to load dotenv, but continue if not available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print("Warning: python-dotenv not found. Using environment variables directly.")
+    print("Make sure PK and BROWSER_ADDRESS are set in your environment.")
+
 from web3 import Web3
 from eth_account import Account
-
-load_dotenv()
 
 # Get credentials
 pk = os.getenv("PK")
