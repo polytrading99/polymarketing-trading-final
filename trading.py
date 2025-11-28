@@ -425,9 +425,14 @@ async def perform_trade(market):
                     )
                     
                     # Bypass send_buy_order and call create_order directly
+                    # Convert token to string explicitly (it's a large integer)
+                    token_str = str(token)
+                    print(f"   Token ID (as string): {token_str}")
+                    print(f"   Token ID length: {len(token_str)}")
+                    
                     try:
                         result = client.create_order(
-                            token,
+                            token_str,  # Pass as string
                             'BUY',
                             test_price,
                             test_size,

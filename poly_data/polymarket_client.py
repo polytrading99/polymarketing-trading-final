@@ -187,6 +187,26 @@ class PolymarketClient:
         except Exception as ex:
             error_str = str(ex)
             print(f"ERROR in create_order: {error_str}")
+            
+            # Provide helpful diagnostics for invalid signature
+            if "invalid signature" in error_str.lower():
+                print(f"\n{'='*60}")
+                print(f"INVALID SIGNATURE - Detailed Diagnostics:")
+                print(f"  Token ID: {str(marketId)}")
+                print(f"  Price: {price}")
+                print(f"  Size: {size}")
+                print(f"  Side: {action}")
+                print(f"  Neg Risk: {neg_risk}")
+                print(f"  Wallet: {self.browser_wallet}")
+                print(f"\n  Most common cause: Wallet hasn't done manual trade on Polymarket")
+                print(f"  Solution:")
+                print(f"    1. Go to https://polymarket.com")
+                print(f"    2. Connect wallet: {self.browser_wallet}")
+                print(f"    3. Make ONE small manual trade (buy or sell any market)")
+                print(f"    4. Wait for transaction to confirm")
+                print(f"    5. Then try again")
+                print(f"{'='*60}\n")
+            
             # Re-raise the exception so caller can handle it
             raise
 
