@@ -227,11 +227,27 @@ class PolymarketClient:
     def get_usdc_balance(self):
         """
         Get the USDC balance of the connected wallet.
+        Checks both USDC.e (bridged) and native USDC contracts.
         
         Returns:
-            float: USDC balance in decimal format
+            float: USDC balance in decimal format (sum of both contracts)
         """
-        return self.usdc_contract.functions.balanceOf(self.browser_wallet).call() / 10**6
+        # Check USDC.e (bridged USDC) - the one Polymarket typically uses
+        balance_usdce = self.usdc_contract.functions.balanceOf(self.browser_wallet).call() / 10**6
+        
+        # Also check native USDC on Polygon
+        native_usdc_address = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
+        try:
+            native_usdc_contract = self.web3.eth.contract(
+                address=native_usdc_address,
+                abi=erc20_abi
+            )
+            balance_native = native_usdc_contract.functions.balanceOf(self.browser_wallet).call() / 10**6
+        except:
+            balance_native = 0.0
+        
+        total_balance = balance_usdce + balance_native
+        return total_balance
      
     def get_pos_balance(self):
         """
