@@ -268,15 +268,27 @@ class PolymarketClient:
             data = res.json()
             
             # Handle different response formats
-            if isinstance(data, dict):
+            if isinstance(data, list):
+                # API returns: [{"user":"...","value":0}]
+                if len(data) > 0:
+                    if isinstance(data[0], dict):
+                        # Look for 'value' key in the dict
+                        if 'value' in data[0]:
+                            return float(data[0]['value'])
+                        # Try other keys
+                        for key in ['total', 'portfolio_value', 'balance']:
+                            if key in data[0]:
+                                return float(data[0][key])
+                    elif isinstance(data[0], (int, float)):
+                        return float(data[0])
+                return 0.0
+            elif isinstance(data, dict):
                 # Try common keys
                 for key in ['value', 'total', 'portfolio_value', 'balance', 'portfolioValue']:
                     if key in data:
                         try:
                             value = data[key]
-                            # Handle if value is a string or number
                             if isinstance(value, str):
-                                # Try to extract number from string
                                 import re
                                 numbers = re.findall(r'\d+\.?\d*', value)
                                 if numbers:
@@ -285,23 +297,6 @@ class PolymarketClient:
                             return float(value)
                         except (ValueError, TypeError):
                             continue
-                # If no standard key found, try to get first numeric value
-                for key, val in data.items():
-                    try:
-                        if isinstance(val, (int, float)):
-                            return float(val)
-                    except:
-                        pass
-                return 0.0
-            elif isinstance(data, list):
-                # If it's a list, try to extract value from items
-                if len(data) > 0:
-                    if isinstance(data[0], dict):
-                        for key in ['value', 'total', 'portfolio_value']:
-                            if key in data[0]:
-                                return float(data[0][key])
-                    elif isinstance(data[0], (int, float)):
-                        return float(data[0])
                 return 0.0
             elif isinstance(data, (int, float)):
                 return float(data)
