@@ -90,31 +90,44 @@ def main():
         print(f"   Creating signed order (not posting yet)...")
         signed_order = client.create_order(order_args)
         print(f"   ✅ Order signed successfully!")
-        print(f"   Order hash: {signed_order.get('hash', 'N/A')}")
-        print(f"   Signature: {signed_order.get('signature', 'N/A')[:50]}...")
+        # SignedOrder is an object, not a dict - access attributes directly
+        try:
+            order_hash = getattr(signed_order, 'hash', 'N/A')
+            signature = getattr(signed_order, 'signature', 'N/A')
+            if isinstance(signature, str):
+                sig_preview = signature[:50] + "..." if len(signature) > 50 else signature
+            else:
+                sig_preview = str(signature)[:50] + "..."
+            print(f"   Order hash: {order_hash}")
+            print(f"   Signature: {sig_preview}")
+        except Exception as e:
+            print(f"   (Could not extract order details: {e})")
         
         print(f"\n5. Attempting to POST order to Polymarket...")
-        print(f"   This will fail if wallet hasn't done manual trade")
+        print(f"   This will fail if wallet hasn't done manual trade on Polymarket CLOB")
         try:
             resp = client.post_order(signed_order)
             print(f"   ✅✅✅ ORDER POSTED SUCCESSFULLY!")
             print(f"   Response: {resp}")
+            print(f"\n   🎉 SUCCESS! Your bot can now place orders!")
+            print(f"   Check your orders at: https://polymarket.com/account/orders")
         except Exception as e:
             error_str = str(e)
             print(f"   ❌ Order post failed: {error_str}")
             
             if "invalid signature" in error_str.lower():
                 print(f"\n   🔴 INVALID SIGNATURE - This means:")
-                print(f"      1. Wallet hasn't done a manual trade, OR")
-                print(f"      2. The trade wasn't confirmed on-chain, OR")
-                print(f"      3. The trade was on a different wallet")
+                print(f"      The wallet has done transactions, but NOT through Polymarket's CLOB")
+                print(f"      Polymarket requires a trade through their CLOB (not just any on-chain tx)")
                 print(f"\n   To fix:")
                 print(f"      1. Go to https://polymarket.com")
                 print(f"      2. Connect wallet: {browser_address}")
-                print(f"      3. Make ONE small manual trade (buy or sell)")
-                print(f"      4. Wait for transaction to confirm on Polygon (check on polygonscan.com)")
+                print(f"      3. Make ONE small manual trade through Polymarket's website")
+                print(f"         (Buy or sell ANY market - must be done on polymarket.com)")
+                print(f"      4. Wait for transaction to confirm on Polygon")
                 print(f"      5. Wait 2-3 minutes for Polymarket to index it")
                 print(f"      6. Run this script again")
+                print(f"\n   Note: Trades on other platforms don't count - must be on Polymarket CLOB")
     except Exception as e:
         print(f"   ❌ Failed to create order: {e}")
         import traceback
