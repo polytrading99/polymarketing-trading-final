@@ -20,15 +20,37 @@ MAX_INT = 2**256 - 1
 def get_clob_client():
     host = "https://clob.polymarket.com"
     key = os.getenv("PK")
+    browser_address = os.getenv("BROWSER_ADDRESS")
     chain_id = POLYGON
     
     if key is None:
         print("Environment variable 'PK' cannot be found")
         return None
-
-
+    
+    if browser_address is None:
+        print("Environment variable 'BROWSER_ADDRESS' cannot be found")
+        return None
+    
+    # Clean up key (remove 0x if present)
+    if key.startswith('0x') or key.startswith('0X'):
+        key = key[2:]
+    
+    # Clean up browser_address
+    browser_address = browser_address.strip()
+    if browser_address.startswith('0x') and len(browser_address) > 42:
+        browser_address = browser_address[:42]
+    
     try:
-        client = ClobClient(host, key=key, chain_id=chain_id)
+        from web3 import Web3
+        browser_address = Web3.to_checksum_address(browser_address)
+        
+        client = ClobClient(
+            host=host,
+            key=key,
+            chain_id=chain_id,
+            funder=browser_address,  # CRITICAL: funder parameter is required for correct signatures
+            signature_type=2
+        )
         api_creds = client.create_or_derive_api_creds()
         client.set_api_creds(api_creds)
         return client
