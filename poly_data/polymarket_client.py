@@ -241,7 +241,25 @@ class PolymarketClient:
             float: Total position value in USDC
         """
         res = requests.get(f'https://data-api.polymarket.com/value?user={self.browser_wallet}')
-        return float(res.json()['value'])
+        data = res.json()
+        
+        # Handle different response formats
+        if isinstance(data, dict):
+            if 'value' in data:
+                return float(data['value'])
+            else:
+                # Try other possible keys
+                for key in ['total', 'portfolio_value', 'balance']:
+                    if key in data:
+                        return float(data[key])
+                return 0.0
+        elif isinstance(data, list) and len(data) > 0:
+            # If it's a list, try to extract value from first item
+            if isinstance(data[0], dict) and 'value' in data[0]:
+                return float(data[0]['value'])
+            return 0.0
+        else:
+            return 0.0
 
     def get_total_balance(self):
         """
@@ -260,7 +278,25 @@ class PolymarketClient:
             DataFrame: All positions with details like market, size, avgPrice
         """
         res = requests.get(f'https://data-api.polymarket.com/positions?user={self.browser_wallet}')
-        return pd.DataFrame(res.json())
+        data = res.json()
+        
+        # Handle different response formats
+        if isinstance(data, list):
+            # Expected format: list of position objects
+            if len(data) == 0:
+                return pd.DataFrame()
+            return pd.DataFrame(data)
+        elif isinstance(data, dict):
+            # If it's a dict, try to find positions key
+            if 'positions' in data:
+                return pd.DataFrame(data['positions'])
+            elif 'data' in data:
+                return pd.DataFrame(data['data'])
+            else:
+                # If dict has position-like structure, try to convert
+                return pd.DataFrame([data])
+        else:
+            return pd.DataFrame()
     
     def get_raw_position(self, tokenId):
         """
