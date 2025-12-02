@@ -262,25 +262,53 @@ class PolymarketClient:
         Returns:
             float: Total position value in USDC
         """
-        res = requests.get(f'https://data-api.polymarket.com/value?user={self.browser_wallet}')
-        data = res.json()
-        
-        # Handle different response formats
-        if isinstance(data, dict):
-            if 'value' in data:
-                return float(data['value'])
-            else:
-                # Try other possible keys
-                for key in ['total', 'portfolio_value', 'balance']:
+        try:
+            res = requests.get(f'https://data-api.polymarket.com/value?user={self.browser_wallet}', timeout=10)
+            res.raise_for_status()
+            data = res.json()
+            
+            # Handle different response formats
+            if isinstance(data, dict):
+                # Try common keys
+                for key in ['value', 'total', 'portfolio_value', 'balance', 'portfolioValue']:
                     if key in data:
-                        return float(data[key])
+                        try:
+                            value = data[key]
+                            # Handle if value is a string or number
+                            if isinstance(value, str):
+                                # Try to extract number from string
+                                import re
+                                numbers = re.findall(r'\d+\.?\d*', value)
+                                if numbers:
+                                    return float(numbers[0])
+                                return 0.0
+                            return float(value)
+                        except (ValueError, TypeError):
+                            continue
+                # If no standard key found, try to get first numeric value
+                for key, val in data.items():
+                    try:
+                        if isinstance(val, (int, float)):
+                            return float(val)
+                    except:
+                        pass
                 return 0.0
-        elif isinstance(data, list) and len(data) > 0:
-            # If it's a list, try to extract value from first item
-            if isinstance(data[0], dict) and 'value' in data[0]:
-                return float(data[0]['value'])
-            return 0.0
-        else:
+            elif isinstance(data, list):
+                # If it's a list, try to extract value from items
+                if len(data) > 0:
+                    if isinstance(data[0], dict):
+                        for key in ['value', 'total', 'portfolio_value']:
+                            if key in data[0]:
+                                return float(data[0][key])
+                    elif isinstance(data[0], (int, float)):
+                        return float(data[0])
+                return 0.0
+            elif isinstance(data, (int, float)):
+                return float(data)
+            else:
+                return 0.0
+        except Exception as e:
+            print(f"Warning: Could not fetch portfolio value: {e}")
             return 0.0
 
     def get_total_balance(self):
@@ -299,25 +327,38 @@ class PolymarketClient:
         Returns:
             DataFrame: All positions with details like market, size, avgPrice
         """
-        res = requests.get(f'https://data-api.polymarket.com/positions?user={self.browser_wallet}')
-        data = res.json()
-        
-        # Handle different response formats
-        if isinstance(data, list):
-            # Expected format: list of position objects
-            if len(data) == 0:
+        try:
+            res = requests.get(f'https://data-api.polymarket.com/positions?user={self.browser_wallet}', timeout=10)
+            res.raise_for_status()
+            data = res.json()
+            
+            # Handle different response formats
+            if isinstance(data, list):
+                # Expected format: list of position objects
+                if len(data) == 0:
+                    return pd.DataFrame()
+                # Ensure all items are dicts before creating DataFrame
+                if all(isinstance(item, dict) for item in data):
+                    return pd.DataFrame(data)
+                else:
+                    # If list contains non-dict items, return empty
+                    return pd.DataFrame()
+            elif isinstance(data, dict):
+                # If it's a dict, try to find positions key
+                for key in ['positions', 'data', 'results', 'items']:
+                    if key in data and isinstance(data[key], list):
+                        if len(data[key]) > 0 and all(isinstance(item, dict) for item in data[key]):
+                            return pd.DataFrame(data[key])
+                # If dict itself looks like a position, try to convert
+                if all(isinstance(v, (str, int, float, bool, type(None))) for v in data.values()):
+                    return pd.DataFrame([data])
                 return pd.DataFrame()
-            return pd.DataFrame(data)
-        elif isinstance(data, dict):
-            # If it's a dict, try to find positions key
-            if 'positions' in data:
-                return pd.DataFrame(data['positions'])
-            elif 'data' in data:
-                return pd.DataFrame(data['data'])
             else:
-                # If dict has position-like structure, try to convert
-                return pd.DataFrame([data])
-        else:
+                return pd.DataFrame()
+        except Exception as e:
+            print(f"Warning: Could not fetch positions: {e}")
+            import traceback
+            traceback.print_exc()
             return pd.DataFrame()
     
     def get_raw_position(self, tokenId):
