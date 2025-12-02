@@ -73,7 +73,7 @@ def main():
     web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
     
     # Check USDC balance
-    usdc_contract = web3.eth.contract(address=USDC_ADDRESS, abi=ERC20_ABI)
+    usdc_contract = web3.eth.contract(address=Web3.to_checksum_address(USDC_ADDRESS), abi=ERC20_ABI)
     usdc_balance = usdc_contract.functions.balanceOf(browser_address).call() / 10**6
     print(f"USDC Balance: ${usdc_balance:.2f}")
     
@@ -84,7 +84,9 @@ def main():
     
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
         try:
-            allowance = usdc_contract.functions.allowance(browser_address, contract_addr).call()
+            # Checksum the contract address before using it
+            contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+            allowance = usdc_contract.functions.allowance(browser_address, contract_addr_checksum).call()
             allowance_usd = allowance / 10**6
             max_uint = 2**256 - 1
             
@@ -106,11 +108,13 @@ def main():
     print("CONDITIONAL TOKEN APPROVALS (ERC1155)")
     print("=" * 70)
     
-    ctf_contract = web3.eth.contract(address=CONDITIONAL_TOKENS_ADDRESS, abi=ERC1155_ABI)
+    ctf_contract = web3.eth.contract(address=Web3.to_checksum_address(CONDITIONAL_TOKENS_ADDRESS), abi=ERC1155_ABI)
     
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
         try:
-            is_approved = ctf_contract.functions.isApprovedForAll(browser_address, contract_addr).call()
+            # Checksum the contract address before using it
+            contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+            is_approved = ctf_contract.functions.isApprovedForAll(browser_address, contract_addr_checksum).call()
             status = "✅ APPROVED" if is_approved else "❌ NOT APPROVED"
             print(f"{name:20} ({contract_addr[:10]}...): {status}")
         except Exception as e:
@@ -126,13 +130,19 @@ def main():
     all_ctf_approved = True
     
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
-        allowance = usdc_contract.functions.allowance(browser_address, contract_addr).call()
-        max_uint = 2**256 - 1
-        if allowance < max_uint - 1000:
+        try:
+            contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+            allowance = usdc_contract.functions.allowance(browser_address, contract_addr_checksum).call()
+            max_uint = 2**256 - 1
+            if allowance < max_uint - 1000:
+                all_usdc_approved = False
+            
+            is_approved = ctf_contract.functions.isApprovedForAll(browser_address, contract_addr_checksum).call()
+            if not is_approved:
+                all_ctf_approved = False
+        except Exception:
+            # If we can't check, assume not approved
             all_usdc_approved = False
-        
-        is_approved = ctf_contract.functions.isApprovedForAll(browser_address, contract_addr).call()
-        if not is_approved:
             all_ctf_approved = False
     
     if all_usdc_approved and all_ctf_approved:
