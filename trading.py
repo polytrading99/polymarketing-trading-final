@@ -71,13 +71,24 @@ def send_buy_order(order):
         if order['price'] >= 0.1 and order['price'] < 0.9:
             print(f'Creating new order for {order["size"]} at {order["price"]}')
             print(order['token'], 'BUY', order['price'], order['size'])
-            client.create_order(
-                order['token'], 
-                'BUY', 
-                order['price'], 
-                order['size'], 
-                True if order['neg_risk'] == 'TRUE' else False
-            )
+            try:
+                result = client.create_order(
+                    order['token'], 
+                    'BUY', 
+                    order['price'], 
+                    order['size'], 
+                    True if order['neg_risk'] == 'TRUE' else False
+                )
+                print(
+                    f"[ORDER BUY SUCCESS] token={order['token']} "
+                    f"price={order['price']} size={order['size']} resp={result}"
+                )
+            except Exception as e:
+                print(
+                    f"[ORDER BUY ERROR] token={order['token']} "
+                    f"price={order['price']} size={order['size']} error={e}"
+                )
+                traceback.print_exc()
         else:
             print("Not creating buy order because its outside acceptable price range (0.1-0.9)")
     else:
@@ -122,10 +133,11 @@ def send_sell_order(order):
     client.create_order(
         order['token'], 
         'SELL', 
-        order['price'], 
-        order['size'], 
+        order['price'],
+        order['size'],
         True if order['neg_risk'] == 'TRUE' else False
     )
+
 
 # Dictionary to store locks for each market to prevent concurrent trading on the same market
 market_locks = {}
