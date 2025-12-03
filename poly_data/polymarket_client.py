@@ -178,10 +178,13 @@ class PolymarketClient:
         signed_order = None
 
         # Handle regular vs negative risk markets differently
-        if neg_risk == False:
-            signed_order = self.client.create_order(order_args)
-        else:
+        # CRITICAL: According to Polymarket docs, incorrect NegRisk flag causes "invalid signature"
+        # - If market IS negrisk → MUST use neg_risk=True
+        # - If market is NOT negrisk → MUST use neg_risk=False (default)
+        if neg_risk:
             signed_order = self.client.create_order(order_args, options=PartialCreateOrderOptions(neg_risk=True))
+        else:
+            signed_order = self.client.create_order(order_args)
             
         try:
             # Submit the signed order to the API as GTC (Good-Till-Cancelled) order
