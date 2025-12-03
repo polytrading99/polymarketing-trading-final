@@ -203,12 +203,43 @@ def main():
         if hasattr(signed_order, 'order'):
             order = signed_order.order
             if hasattr(order, 'maker'):
-                print(f"   Maker (funder): {order.maker}")
-                if order.maker.lower() != proxy_address.lower():
-                    print(f"   ⚠️  WARNING: Order maker ({order.maker}) doesn't match funder ({proxy_address})!")
+                maker_str = str(order.maker)
+                print(f"   Maker (funder): {maker_str}")
+                if maker_str.lower() != proxy_address.lower():
+                    print(f"   ⚠️  WARNING: Order maker ({maker_str}) doesn't match funder ({proxy_address})!")
                     print(f"      This could cause 'invalid signature' errors")
                 else:
                     print(f"   ✅ Order maker matches funder address")
+        
+        # Try to actually POST the order to see the real error
+        print(f"\n7. ATTEMPTING TO POST ORDER (this will show the real error)")
+        print("-" * 70)
+        
+        try:
+            from py_clob_client.clob_types import OrderType
+            resp = client.post_order(signed_order, OrderType.GTC)
+            print(f"✅✅✅ ORDER POSTED SUCCESSFULLY!")
+            print(f"Response: {resp}")
+        except Exception as e:
+            error_str = str(e)
+            print(f"❌ Order posting failed: {error_str}")
+            
+            if "invalid signature" in error_str.lower():
+                print(f"\n🔴 INVALID SIGNATURE ERROR DETECTED")
+                print(f"\nEven though:")
+                print(f"  ✅ Wallet has trading history (portfolio: ${portfolio_value:.2f}, positions: {position_count})")
+                print(f"  ✅ Order signed successfully")
+                print(f"  ✅ Client initialized correctly")
+                print(f"\nThis suggests:")
+                print(f"  1. The signature format might be incorrect")
+                print(f"  2. The funder address in the signature doesn't match what Polymarket expects")
+                print(f"  3. There might be a mismatch between the signed order and API expectations")
+                print(f"\nTry:")
+                print(f"  1. Make a NEW manual trade on Polymarket.com with THIS proxy")
+                print(f"  2. Wait 2-3 minutes after the trade confirms")
+                print(f"  3. Try again")
+                print(f"\nIf it still fails, the issue might be in py_clob_client library")
+                print(f"or how Polymarket validates signatures for this specific proxy type.")
         
     except Exception as e:
         print(f"❌ Failed to create signed order: {e}")
