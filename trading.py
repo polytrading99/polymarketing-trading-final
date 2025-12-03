@@ -512,6 +512,12 @@ async def perform_trade(market):
 
                 # Minimum size constraint from config
                 min_size = row.get('min_size') or 0
+                min_size = float(min_size) if min_size else 5.0  # Default to 5 USDC if not specified
+                
+                # Ensure buy_amount meets minimum requirement
+                if buy_amount > 0 and buy_amount < min_size:
+                    print(f"⚠️  Buy amount {buy_amount} is below minimum {min_size}, adjusting to {min_size}")
+                    buy_amount = min_size
 
                 # Only basic constraints: position below max_size and we actually want to buy
                 if position < max_size and position < 250 and buy_amount > 0 and buy_amount >= min_size:
