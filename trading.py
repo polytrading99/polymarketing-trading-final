@@ -67,9 +67,21 @@ def send_buy_order(order):
         trade = False
 
     if trade:
+        # Check minimum order size requirement
+        min_size = order.get('min_size', 0)
+        if min_size and min_size > 0:
+            min_size = float(min_size)
+        else:
+            min_size = 5.0  # Default minimum is usually 5 USDC
+        
+        # Ensure order size meets minimum requirement
+        if order['size'] < min_size:
+            print(f"⚠️  Order size {order['size']} is below minimum {min_size}, adjusting to {min_size}")
+            order['size'] = min_size
+        
         # Only place orders with prices between 0.1 and 0.9 to avoid extreme positions
         if order['price'] >= 0.1 and order['price'] < 0.9:
-            print(f'Creating new order for {order["size"]} at {order["price"]}')
+            print(f'Creating new order for {order["size"]} at {order["price"]} (min: {min_size})')
             print(order['token'], 'BUY', order['price'], order['size'])
             try:
                 result = client.create_order(
@@ -84,10 +96,16 @@ def send_buy_order(order):
                     f"price={order['price']} size={order['size']} resp={result}"
                 )
             except Exception as e:
+                error_str = str(e)
                 print(
                     f"[ORDER BUY ERROR] token={order['token']} "
-                    f"price={order['price']} size={order['size']} error={e}"
+                    f"price={order['price']} size={order['size']} error={error_str}"
                 )
+                # Check if it's a minimum size error
+                if "lower than the minimum" in error_str.lower() or "minimum:" in error_str.lower():
+                    print(f"⚠️  Minimum size error detected. Market requires at least {min_size} USDC")
+                    print(f"   Current order size: {order['size']}")
+                    print(f"   Try increasing order size in your configuration")
                 traceback.print_exc()
         else:
             print("Not creating buy order because its outside acceptable price range (0.1-0.9)")
@@ -398,7 +416,13 @@ async def perform_trade(market):
                 if not global_state.test_order_placed:
                     # Find any valid price to place an order
                     test_price = None
-                    test_size = 1.0  # Use 1 USDC for testing
+                    # Get minimum order size from market data
+                    min_size = row.get('min_size', 0)
+                    if min_size and min_size > 0:
+                        min_size = float(min_size)
+                    else:
+                        min_size = 5.0  # Default minimum is usually 5 USDC
+                    test_size = max(min_size, 5.0)  # Use minimum size or 5 USDC, whichever is higher
                     
                     # Try to use bid_price if available
                     if bid_price is not None and 0.01 <= bid_price <= 0.99:
@@ -432,7 +456,7 @@ async def perform_trade(market):
                         f"PLACING TEST BUY ORDER (ONE TIME ONLY)\n"
                         f"Token: {token} ({detail['answer']})\n"
                         f"Price: {test_price}\n"
-                        f"Size: {test_size} USDC\n"
+                        f"Size: {test_size} USDC (min required: {min_size} USDC)\n"
                         f"Market: {row['question']}\n"
                         f"{'='*60}\n"
                     )

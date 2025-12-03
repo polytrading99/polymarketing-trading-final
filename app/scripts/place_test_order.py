@@ -106,9 +106,14 @@ async def main() -> None:
     token_yes = tokens[0].get('token_id')
     token_no = tokens[1].get('token_id')
     
-    # Check if neg_risk (has rewards)
+    # Check if neg_risk (has rewards) and get minimum order size
     rewards = market.get('rewards', {})
     neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
+    min_size = rewards.get('min_size', 0)  # Get minimum order size from market
+    if min_size and min_size > 0:
+        min_size = float(min_size)
+    else:
+        min_size = 5.0  # Default minimum is usually 5 USDC
     
     print(f"\n{'='*60}")
     print(f"Selected Market:")
@@ -117,6 +122,7 @@ async def main() -> None:
     print(f"  Token YES: {token_yes}")
     print(f"  Token NO: {token_no}")
     print(f"  Neg Risk: {neg_risk}")
+    print(f"  Min Order Size: {min_size} USDC")
     print(f"{'='*60}\n")
     
     # Initialize Polymarket client
@@ -153,13 +159,13 @@ async def main() -> None:
         print("Using default price 0.5")
         price = 0.5
     
-    # Real order size (1 USDC)
-    size = 1.0
+    # Use minimum order size (from market requirements)
+    size = max(min_size, 5.0)  # At least 5 USDC, or market minimum if higher
     
     print(f"\nPlacing REAL BUY order:")
     print(f"  Token: {token_yes}")
     print(f"  Price: {price}")
-    print(f"  Size: {size} USDC")
+    print(f"  Size: {size} USDC (minimum required: {min_size} USDC)")
     print(f"  Neg Risk: {neg_risk}")
     print()
     
@@ -196,6 +202,13 @@ async def main() -> None:
             print("  5. Then run this script again\n")
             print("This is a Polymarket security requirement - once you do one manual trade,")
             print("all future API orders will work automatically.")
+        elif "lower than the minimum" in error_str.lower() or "minimum:" in error_str.lower():
+            print("🔴 MINIMUM ORDER SIZE ERROR")
+            print("\nThe order size is below the market's minimum requirement.")
+            print(f"Market minimum: {min_size} USDC")
+            print(f"Attempted size: {size} USDC")
+            print("\nThe script should automatically use the correct minimum size.")
+            print("If you see this error, there may be a bug in size calculation.")
         else:
             print("Check the error message above for details.")
         

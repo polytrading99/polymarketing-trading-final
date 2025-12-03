@@ -111,9 +111,17 @@ def main():
         rewards = market.get('rewards', {})
         is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
         
+        # Get minimum order size from market
+        min_size = rewards.get('min_size', 0)
+        if min_size and min_size > 0:
+            min_size = float(min_size)
+        else:
+            min_size = 5.0  # Default minimum is usually 5 USDC
+        
         print(f"   Market: {question}")
         print(f"   Token: {token_yes}")
         print(f"   Neg Risk: {is_neg_risk}")
+        print(f"   Min Order Size: {min_size} USDC")
         
         # Get order book to find good price
         try:
@@ -135,17 +143,20 @@ def main():
             price = 0.5
             print(f"   Could not get order book: {e}, using price: {price}")
         
+        # Use minimum order size
+        order_size = max(min_size, 5.0)  # At least 5 USDC, or market minimum if higher
+        
         print(f"\n   Placing BUY order:")
         print(f"      Token: {token_yes}")
         print(f"      Price: {price}")
-        print(f"      Size: 1.0 USDC")
+        print(f"      Size: {order_size} USDC (minimum: {min_size} USDC)")
         print(f"      Neg Risk: {is_neg_risk}")
         
         resp = client.create_order(
             marketId=str(token_yes),
             action="BUY",
             price=price,
-            size=1.0,
+            size=order_size,
             neg_risk=is_neg_risk
         )
         
