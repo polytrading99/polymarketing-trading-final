@@ -333,9 +333,14 @@ async def perform_trade(market):
                     max_size = max_size_raw
 
                 # Prepare order object with all necessary information
+                # Get minimum order size from market config
+                min_size = row.get('min_size', 0)
+                min_size = float(min_size) if min_size else 5.0  # Default to 5 USDC if not specified
+                
                 order = {
                     "token": token,
                     "mid_price": mid_price,
+                    "min_size": min_size,  # Include min_size in order dict
                     "neg_risk": row['neg_risk'],
                     "max_spread": row['max_spread'],
                     'orders': orders,
