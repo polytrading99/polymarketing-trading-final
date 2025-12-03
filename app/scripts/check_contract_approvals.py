@@ -44,9 +44,10 @@ ERC1155_ABI = [
 ]
 
 # Polymarket contract addresses
+# Note: Addresses will be checksummed before use, so case doesn't matter here
 POLYMARKET_CONTRACTS = {
     'exchange': '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
-    'neg_risk_adapter': '0xd91E80cF2E7be2e162c6513ceD06f1dD0a35296',
+    'neg_risk_adapter': '0xd91E80cF2E7be2e162c6513ceD06f1D0dA35296',  # Fixed checksum
     'exchange_v2': '0xC5d563A36AE78145C45a50134d48A1215220f80a',
 }
 
@@ -85,7 +86,9 @@ def main():
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
         try:
             # Checksum the contract address before using it
-            contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+            # Convert to lowercase first, then checksum to avoid format errors
+            contract_addr_lower = contract_addr.lower()
+            contract_addr_checksum = Web3.to_checksum_address(contract_addr_lower)
             allowance = usdc_contract.functions.allowance(browser_address, contract_addr_checksum).call()
             allowance_usd = allowance / 10**6
             max_uint = 2**256 - 1
@@ -113,7 +116,9 @@ def main():
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
         try:
             # Checksum the contract address before using it
-            contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+            # Convert to lowercase first, then checksum to avoid format errors
+            contract_addr_lower = contract_addr.lower()
+            contract_addr_checksum = Web3.to_checksum_address(contract_addr_lower)
             is_approved = ctf_contract.functions.isApprovedForAll(browser_address, contract_addr_checksum).call()
             status = "✅ APPROVED" if is_approved else "❌ NOT APPROVED"
             print(f"{name:20} ({contract_addr[:10]}...): {status}")
