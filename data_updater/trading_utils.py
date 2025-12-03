@@ -71,70 +71,153 @@ def get_clob_client():
 
 
 def approveContracts():
+    """
+    Approve Polymarket contracts programmatically.
+    This approves contracts from your MetaMask wallet address.
+    
+    Note: If you're using a Polymarket proxy address (different from MetaMask),
+    you may need to approve from the proxy address instead. In that case,
+    use the approve_contracts_programmatic.py script which handles both cases.
+    """
     web3 = Web3(Web3.HTTPProvider("https://polygon-rpc.com"))
     web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-    wallet = web3.eth.account.from_key(os.getenv("PK"))
     
+    # Get private key
+    priv_key = os.getenv("PK")
+    if not priv_key:
+        raise ValueError("PK environment variable not set")
     
-    with open('erc20ABI.json', 'r') as file:
-        erc20_abi = json.load(file)
-
+    # Clean private key (remove 0x if present)
+    if priv_key.startswith('0x') or priv_key.startswith('0X'):
+        priv_key = priv_key[2:]
+    
+    wallet = web3.eth.account.from_key(priv_key)
+    pub_key = wallet.address
+    
+    print(f"Approving contracts from wallet: {pub_key}")
+    
+    # ERC20 ABI for approve
+    erc20_approve_abi = [
+        {
+            "constant": False,
+            "inputs": [
+                {"name": "_spender", "type": "address"},
+                {"name": "_value", "type": "uint256"}
+            ],
+            "name": "approve",
+            "outputs": [{"name": "", "type": "bool"}],
+            "payable": False,
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }
+    ]
+    
+    # ERC1155 ABI for setApprovalForAll
+    erc1155_set_approval_abi = [
+        {
+            "inputs": [
+                {"internalType": "address", "name": "operator", "type": "address"},
+                {"internalType": "bool", "name": "approved", "type": "bool"}
+            ],
+            "name": "setApprovalForAll",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }
+    ]
+    
     ctf_address = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
-    erc1155_set_approval = """[{"inputs": [{ "internalType": "address", "name": "operator", "type": "address" },{ "internalType": "bool", "name": "approved", "type": "bool" }],"name": "setApprovalForAll","outputs": [],"stateMutability": "nonpayable","type": "function"}]"""
-
-    usdc_contract = web3.eth.contract(address="0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", abi=erc20_abi)   # usdc.e
-    ctf_contract = web3.eth.contract(address=ctf_address, abi=erc1155_set_approval)
+    usdc_address = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     
-
-    for address in ['0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E', '0xC5d563A36AE78145C45a50134d48A1215220f80a', '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296']:
-        usdc_nonce = web3.eth.get_transaction_count( wallet.address )
-        raw_usdc_txn = usdc_contract.functions.approve(address, int(MAX_INT, 0)).build_transaction({
-            "chainId": 137, 
-            "from": wallet.address, 
-            "nonce": usdc_nonce
-        })
-        signed_usdc_txn = web3.eth.account.sign_transaction(raw_usdc_txn, private_key=os.getenv("PK"))
-        usdc_tx_receipt = web3.eth.wait_for_transaction_receipt(signed_usdc_txn, 600)
-
-
-        print(f'USDC Transaction for {address} returned {usdc_tx_receipt}')
-        time.sleep(1)
-
-        ctf_nonce = web3.eth.get_transaction_count( wallet.address )
+    usdc_contract = web3.eth.contract(
+        address=Web3.to_checksum_address(usdc_address),
+        abi=erc20_approve_abi
+    )
+    ctf_contract = web3.eth.contract(
+        address=Web3.to_checksum_address(ctf_address),
+        abi=erc1155_set_approval_abi
+    )
+    
+    # Polymarket contract addresses to approve
+    polymarket_addresses = [
+        '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',  # CTF Exchange
+        '0xC5d563A36AE78145C45a50134d48A1215220f80a',  # Neg Risk CTF Exchange
+        '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296',  # Neg Risk Adapter
+    ]
+    
+    for contract_addr in polymarket_addresses:
+        contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+        print(f"\nApproving contracts for: {contract_addr}")
         
-        raw_ctf_approval_txn = ctf_contract.functions.setApprovalForAll(address, True).build_transaction({
-            "chainId": 137, 
-            "from": wallet.address, 
-            "nonce": ctf_nonce
-        })
-
-        signed_ctf_approval_tx = web3.eth.account.sign_transaction(raw_ctf_approval_txn, private_key=os.getenv("PK"))
-        send_ctf_approval_tx = web3.eth.send_raw_transaction(signed_ctf_approval_tx.raw_transaction)
-        ctf_approval_tx_receipt = web3.eth.wait_for_transaction_receipt(send_ctf_approval_tx, 600)
-
-        print(f'CTF Transaction for {address} returned {ctf_approval_tx_receipt}')
+        # 1. Approve USDC
+        try:
+            nonce = web3.eth.get_transaction_count(pub_key)
+            raw_usdc_txn = usdc_contract.functions.approve(
+                contract_addr_checksum,
+                int(MAX_INT, 0)
+            ).build_transaction({
+                "chainId": 137,
+                "from": pub_key,
+                "nonce": nonce,
+                "gasPrice": web3.eth.gas_price,
+            })
+            
+            # Estimate gas
+            try:
+                gas_estimate = web3.eth.estimate_gas(raw_usdc_txn)
+                raw_usdc_txn['gas'] = int(gas_estimate * 1.2)
+            except:
+                raw_usdc_txn['gas'] = 100000
+            
+            signed_usdc_txn = web3.eth.account.sign_transaction(raw_usdc_txn, private_key=priv_key)
+            tx_hash = web3.eth.send_raw_transaction(signed_usdc_txn.raw_transaction)
+            usdc_tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=600)
+            
+            if usdc_tx_receipt.status == 1:
+                print(f'  ✅ USDC approval successful: {tx_hash.hex()}')
+            else:
+                print(f'  ❌ USDC approval failed: {tx_hash.hex()}')
+        except Exception as e:
+            print(f'  ❌ USDC approval error: {e}')
+            continue
+        
         time.sleep(1)
-
-
-
-    nonce = web3.eth.get_transaction_count( wallet.address )
-    raw_txn_2 = usdc_contract.functions.approve("0xC5d563A36AE78145C45a50134d48A1215220f80a", int(MAX_INT, 0)).build_transaction({
-        "chainId": 137, 
-        "from": wallet.address, 
-        "nonce": nonce
-    })
-    signed_txn_2 = web3.eth.account.sign_transaction(raw_txn_2, private_key=os.getenv("PK"))
-    send_txn_2 = web3.eth.send_raw_transaction(signed_txn_2.raw_transaction)
-
-
-    nonce = web3.eth.get_transaction_count( wallet.address )
-    raw_txn_3 = usdc_contract.functions.approve("0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296", int(MAX_INT, 0)).build_transaction({
-        "chainId": 137, 
-        "from": wallet.address, 
-        "nonce": nonce
-    })
-    signed_txn_3 = web3.eth.account.sign_transaction(raw_txn_3, private_key=os.getenv("PK"))
-    send_txn_3 = web3.eth.send_raw_transaction(signed_txn_3.raw_transaction)
+        
+        # 2. Approve Conditional Tokens (ERC1155)
+        try:
+            nonce = web3.eth.get_transaction_count(pub_key)
+            raw_ctf_txn = ctf_contract.functions.setApprovalForAll(
+                contract_addr_checksum,
+                True
+            ).build_transaction({
+                "chainId": 137,
+                "from": pub_key,
+                "nonce": nonce,
+                "gasPrice": web3.eth.gas_price,
+            })
+            
+            # Estimate gas
+            try:
+                gas_estimate = web3.eth.estimate_gas(raw_ctf_txn)
+                raw_ctf_txn['gas'] = int(gas_estimate * 1.2)
+            except:
+                raw_ctf_txn['gas'] = 100000
+            
+            signed_ctf_txn = web3.eth.account.sign_transaction(raw_ctf_txn, private_key=priv_key)
+            tx_hash = web3.eth.send_raw_transaction(signed_ctf_txn.raw_transaction)
+            ctf_tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=600)
+            
+            if ctf_tx_receipt.status == 1:
+                print(f'  ✅ Conditional Tokens approval successful: {tx_hash.hex()}')
+            else:
+                print(f'  ❌ Conditional Tokens approval failed: {tx_hash.hex()}')
+        except Exception as e:
+            print(f'  ❌ Conditional Tokens approval error: {e}')
+            continue
+        
+        time.sleep(1)
+    
+    print(f"\n✅ Approval process complete!")
     
     
 def market_action( marketId, action, price, size ):
