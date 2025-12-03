@@ -55,7 +55,11 @@ class PolymarketClient:
         if not key:
             raise ValueError("PK (private key) environment variable is not set! Bot cannot authenticate.")
         if not browser_address:
-            raise ValueError("BROWSER_ADDRESS environment variable is not set! Bot cannot identify wallet.")
+            raise ValueError(
+                "BROWSER_ADDRESS environment variable is not set! Bot cannot identify wallet.\n"
+                "IMPORTANT: BROWSER_ADDRESS must be the POLYMARKET PROXY ADDRESS (shown below your profile picture on Polymarket.com),\n"
+                "NOT your MetaMask wallet address. This is the address that holds your funds on Polymarket."
+            )
         
         # Validate and clean private key format
         key = key.strip()
@@ -109,12 +113,18 @@ class PolymarketClient:
         # Initialize the Polymarket API client
         # Following Polymarket guide: Browser Wallet initialization
         # signature_type=2 for Browser Wallet (Metamask, Coinbase Wallet, etc)
-        # funder is the address listed below your profile picture on Polymarket site
+        # 
+        # CRITICAL: The 'funder' parameter MUST be the POLYMARKET PROXY ADDRESS:
+        # - This is the address shown BELOW your profile picture on Polymarket.com
+        # - This is DIFFERENT from your MetaMask wallet address
+        # - When you connect MetaMask to Polymarket, Polymarket creates a proxy contract
+        # - The proxy address is what actually holds your funds on Polymarket
+        # - The PK should still be your MetaMask private key (which controls the proxy)
         self.client = ClobClient(
             host=host,
             key=key,
             chain_id=chain_id,
-            funder=self.browser_wallet,  # POLYMARKET_PROXY_ADDRESS from guide
+            funder=self.browser_wallet,  # POLYMARKET_PROXY_ADDRESS (below profile picture)
             signature_type=2  # 2 for Browser Wallet, 1 for Email/Magic
         )
 

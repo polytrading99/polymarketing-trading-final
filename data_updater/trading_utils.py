@@ -46,12 +46,18 @@ def get_clob_client():
         
         # Initialize ClobClient following Polymarket guide
         # signature_type=2 for Browser Wallet (Metamask, Coinbase Wallet, etc)
-        # funder is the address listed below your profile picture on Polymarket site
+        # 
+        # CRITICAL: The 'funder' parameter MUST be the POLYMARKET PROXY ADDRESS:
+        # - This is the address shown BELOW your profile picture on Polymarket.com
+        # - This is DIFFERENT from your MetaMask wallet address
+        # - When you connect MetaMask to Polymarket, Polymarket creates a proxy contract
+        # - The proxy address is what actually holds your funds on Polymarket
+        # - The PK should still be your MetaMask private key (which controls the proxy)
         client = ClobClient(
             host=host,
             key=key,
             chain_id=chain_id,
-            funder=browser_address,  # POLYMARKET_PROXY_ADDRESS from guide
+            funder=browser_address,  # POLYMARKET_PROXY_ADDRESS (below profile picture)
             signature_type=2  # 2 for Browser Wallet, 1 for Email/Magic
         )
         api_creds = client.create_or_derive_api_creds()
