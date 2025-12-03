@@ -3,7 +3,7 @@ import os                           # Operating system interface
 
 # Polymarket API client libraries
 from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import OrderArgs, BalanceAllowanceParams, AssetType, PartialCreateOrderOptions
+from py_clob_client.clob_types import OrderArgs, BalanceAllowanceParams, AssetType, PartialCreateOrderOptions, OrderType
 from py_clob_client.constants import POLYGON
 
 # Web3 libraries for blockchain interaction
@@ -107,12 +107,15 @@ class PolymarketClient:
             raise ValueError(f"Invalid BROWSER_ADDRESS format: {e}. Address: {browser_address[:20]}...")
 
         # Initialize the Polymarket API client
+        # Following Polymarket guide: Browser Wallet initialization
+        # signature_type=2 for Browser Wallet (Metamask, Coinbase Wallet, etc)
+        # funder is the address listed below your profile picture on Polymarket site
         self.client = ClobClient(
             host=host,
             key=key,
             chain_id=chain_id,
-            funder=self.browser_wallet,
-            signature_type=2
+            funder=self.browser_wallet,  # POLYMARKET_PROXY_ADDRESS from guide
+            signature_type=2  # 2 for Browser Wallet, 1 for Email/Magic
         )
 
         # Set up API credentials
@@ -181,8 +184,8 @@ class PolymarketClient:
             signed_order = self.client.create_order(order_args, options=PartialCreateOrderOptions(neg_risk=True))
             
         try:
-            # Submit the signed order to the API
-            resp = self.client.post_order(signed_order)
+            # Submit the signed order to the API as GTC (Good-Till-Cancelled) order
+            resp = self.client.post_order(signed_order, OrderType.GTC)
             return resp
         except Exception as ex:
             error_str = str(ex)

@@ -44,12 +44,15 @@ def get_clob_client():
         from web3 import Web3
         browser_address = Web3.to_checksum_address(browser_address)
         
+        # Initialize ClobClient following Polymarket guide
+        # signature_type=2 for Browser Wallet (Metamask, Coinbase Wallet, etc)
+        # funder is the address listed below your profile picture on Polymarket site
         client = ClobClient(
             host=host,
             key=key,
             chain_id=chain_id,
-            funder=browser_address,  # CRITICAL: funder parameter is required for correct signatures
-            signature_type=2
+            funder=browser_address,  # POLYMARKET_PROXY_ADDRESS from guide
+            signature_type=2  # 2 for Browser Wallet, 1 for Email/Magic
         )
         api_creds = client.create_or_derive_api_creds()
         client.set_api_creds(api_creds)
