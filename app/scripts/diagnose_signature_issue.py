@@ -203,11 +203,33 @@ def main():
         if hasattr(signed_order, 'order'):
             order = signed_order.order
             if hasattr(order, 'maker'):
-                maker_str = str(order.maker)
-                print(f"   Maker (funder): {maker_str}")
+                # Extract actual maker address - it might be an Address object
+                maker_obj = order.maker
+                if hasattr(maker_obj, 'address'):
+                    maker_str = str(maker_obj.address)
+                elif hasattr(maker_obj, '__str__'):
+                    maker_str = str(maker_obj)
+                else:
+                    maker_str = str(maker_obj)
+                
+                # Remove any extra formatting
+                maker_str = maker_str.replace('Address(', '').replace(')', '').strip()
+                if maker_str.startswith("'") and maker_str.endswith("'"):
+                    maker_str = maker_str[1:-1]
+                
+                print(f"   Maker address in order: {maker_str}")
+                print(f"   Expected funder: {proxy_address}")
+                
                 if maker_str.lower() != proxy_address.lower():
-                    print(f"   ⚠️  WARNING: Order maker ({maker_str}) doesn't match funder ({proxy_address})!")
-                    print(f"      This could cause 'invalid signature' errors")
+                    print(f"\n   🔴 CRITICAL: Order maker ({maker_str}) doesn't match funder ({proxy_address})!")
+                    print(f"      This WILL cause 'invalid signature' errors!")
+                    print(f"\n   ROOT CAUSE: The ClobClient is using the wrong address as maker.")
+                    print(f"      The funder parameter should set the maker, but it's not working.")
+                    print(f"\n   POSSIBLE FIXES:")
+                    print(f"      1. Try using signature_type=1 instead of 2")
+                    print(f"      2. Check if PK corresponds to the MetaMask wallet that controls the proxy")
+                    print(f"      3. Verify the proxy address is correct on Polymarket.com")
+                    print(f"      4. The maker might need to be the MetaMask address, not the proxy")
                 else:
                     print(f"   ✅ Order maker matches funder address")
         
