@@ -149,51 +149,12 @@ async def main() -> None:
                     print(f"   Checked {markets_checked} markets")
                     break
             
-            # If no market fits, try to get more markets
+            # If still no market found, we've exhausted the list
             if not market:
-                print(f"⚠️  No market found in first {markets_checked} markets with min_size ≤ ${usdc_balance:.2f}")
-                print(f"   Trying to fetch more markets...")
-                
-                # Try to get more markets with cursor
-                try:
-                    cursor = markets.get('next_cursor')
-                    if cursor:
-                        more_markets = clob_client.get_sampling_markets(next_cursor=cursor)
-                        if more_markets and 'data' in more_markets:
-                            for m in more_markets['data'][:100]:
-                                rewards = m.get('rewards', {})
-                                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
-                                if min_size <= usdc_balance:
-                                    market = m
-                                    print(f"✅ Found market with min_size ${min_size} (fits balance)")
-                                    break
-                except:
-                    pass
-            
-            # If still no market fits, try the best one we found
-            if not market and best_market:
-                market = best_market
-                rewards = market.get('rewards', {})
-                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
-                print(f"⚠️  Using market with lowest min_size found: ${min_size}")
-                if min_size > usdc_balance:
-                    print(f"   This is still above your balance (${usdc_balance:.2f})")
-                    print(f"   But we'll try anyway - some markets may accept smaller orders")
-                else:
-                    print(f"   This should work!")
-            elif not market:
-                # Last resort: try first regular (non-neg-risk) market
-                for m in markets['data'][:100]:
-                    rewards = m.get('rewards', {})
-                    is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
-                    if not is_neg_risk:
-                        market = m
-                        print(f"✅ Found regular market (no neg-risk, likely lower minimum)")
-                        break
-                
-                if not market:
-                    market = markets['data'][0]
-                    print(f"⚠️  Using first available market (may have high minimum)")
+                print(f"\n❌ ERROR: Could not find any suitable market after checking {markets_checked} markets")
+                print(f"   This is unusual - most markets should be regular (non-neg-risk) with $1 minimum")
+                print(f"   Please check Polymarket.com to see if there are active markets")
+                return
         except Exception as e:
             print(f"ERROR: Failed to fetch markets: {e}")
             return
