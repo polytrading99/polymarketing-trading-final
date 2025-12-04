@@ -80,11 +80,16 @@ def main():
     wallet = web3.eth.account.from_key(priv_key)
     pub_key = wallet.address
     
-    print(f"\nWallet: {pub_key}")
-    print(f"Proxy: {browser_address}")
+    # IMPORTANT: For Polymarket, approvals need to be from the PROXY address
+    # But we can only sign from the MetaMask wallet
+    # Check if browser_address is the proxy or the wallet
+    proxy_address = Web3.to_checksum_address(browser_address)
+    
+    print(f"\nMetaMask Wallet: {pub_key}")
+    print(f"Proxy Address: {proxy_address}")
     print(f"Neg Risk Adapter: {NEG_RISK_ADAPTER}\n")
     
-    # Check MATIC balance
+    # Check MATIC balance (need it in MetaMask wallet for gas)
     matic_balance = web3.eth.get_balance(pub_key) / 10**18
     print(f"MATIC Balance: {matic_balance:.4f} MATIC")
     
@@ -106,18 +111,23 @@ def main():
     adapter_checksum = Web3.to_checksum_address(NEG_RISK_ADAPTER)
     
     # 1. Approve USDC
+    # NOTE: Approvals must be from the PROXY address, not MetaMask wallet
+    # But we sign with MetaMask wallet. If proxy is different, we need to check
     print(f"\n{'='*70}")
     print("1. Approving USDC for Neg Risk Adapter...")
     print("="*70)
+    print(f"   Approving FROM: {proxy_address}")
+    print(f"   Approving TO: {adapter_checksum}")
     
     try:
-        nonce = web3.eth.get_transaction_count(pub_key)
+        # Use proxy address for the approval (where funds are)
+        nonce = web3.eth.get_transaction_count(proxy_address)
         raw_txn = usdc_contract.functions.approve(
             adapter_checksum,
             int(MAX_INT, 0)
         ).build_transaction({
             "chainId": 137,
-            "from": pub_key,
+            "from": proxy_address,  # Approve from proxy (where USDC is)
             "nonce": nonce,
             "gasPrice": web3.eth.gas_price,
         })
@@ -152,15 +162,18 @@ def main():
     print(f"\n{'='*70}")
     print("2. Approving Conditional Tokens (ERC1155) for Neg Risk Adapter...")
     print("="*70)
+    print(f"   Approving FROM: {proxy_address}")
+    print(f"   Approving TO: {adapter_checksum}")
     
     try:
-        nonce = web3.eth.get_transaction_count(pub_key)
+        # Use proxy address for the approval
+        nonce = web3.eth.get_transaction_count(proxy_address)
         raw_txn = ctf_contract.functions.setApprovalForAll(
             adapter_checksum,
             True
         ).build_transaction({
             "chainId": 137,
-            "from": pub_key,
+            "from": proxy_address,  # Approve from proxy
             "nonce": nonce,
             "gasPrice": web3.eth.gas_price,
         })
