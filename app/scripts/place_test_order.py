@@ -159,31 +159,48 @@ async def main() -> None:
         print("Using default price 0.5")
         price = 0.5
     
-    # Check balance and use appropriate order size
+    # Check balance and calculate order size
+    # IMPORTANT: size parameter in OrderArgs is TOKEN AMOUNT, not USDC amount
+    # For BUY orders: token_amount = usdc_amount / price
     try:
         usdc_balance = client.get_usdc_balance()
         print(f"USDC Balance: ${usdc_balance:.2f}")
         
-        # Use smaller of: min_size, 90% of balance, or 10 USDC max for testing
-        size = min(max(min_size, 5.0), max(usdc_balance * 0.9, 5.0), 10.0)
+        # Calculate max USDC we can spend (90% of balance, but at least $5)
+        max_usdc = min(usdc_balance * 0.9, 10.0)  # Cap at 10 USDC for testing
+        max_usdc = max(max_usdc, 5.0)  # At least $5
         
-        if size > usdc_balance:
-            print(f"⚠️  Warning: Order size {size} exceeds balance {usdc_balance}")
-            print(f"   Using {usdc_balance * 0.9:.2f} USDC instead")
-            size = max(usdc_balance * 0.9, 5.0)
+        # Check if we can meet market minimum
+        if min_size > usdc_balance:
+            print(f"❌ ERROR: Market requires ${min_size} USDC minimum")
+            print(f"   But you only have ${usdc_balance:.2f} USDC")
+            print(f"   Cannot place order on this market")
+            print(f"\n   Solution:")
+            print(f"   1. Find a market with lower minimum (try searching)")
+            print(f"   2. Or add more USDC to your wallet")
+            return
         
-        if size < min_size:
-            print(f"⚠️  Warning: Order size {size} is below market minimum {min_size}")
-            print(f"   This order may be rejected by Polymarket")
+        # Use the smaller of: min_size or max_usdc
+        usdc_to_spend = min(min_size, max_usdc)
+        
+        # Convert USDC amount to token amount: tokens = usdc / price
+        # For BUY orders, we're buying tokens, so size = usdc_amount / price
+        size = usdc_to_spend / price
+        
+        print(f"   Will spend: ${usdc_to_spend:.2f} USDC")
+        print(f"   Token amount: {size:.2f} tokens (at price {price})")
+        print(f"   USDC value: ${size * price:.2f}")
+        
     except Exception as e:
         print(f"⚠️  Could not check balance: {e}")
-        # Fallback to min_size or 5 USDC
-        size = max(min_size, 5.0)
+        # Fallback: use min_size converted to tokens
+        size = min_size / price
     
     print(f"\nPlacing REAL BUY order:")
     print(f"  Token: {token_yes}")
     print(f"  Price: {price}")
-    print(f"  Size: {size} USDC (market minimum: {min_size} USDC)")
+    print(f"  Size: {size:.2f} tokens (${size * price:.2f} USDC)")
+    print(f"  Market minimum: ${min_size} USDC")
     print(f"  Neg Risk: {neg_risk}")
     print()
     

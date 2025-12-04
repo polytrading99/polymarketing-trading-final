@@ -171,17 +171,27 @@ class PolymarketClient:
             marketId (str): ID of the market token to trade
             action (str): "BUY" or "SELL"
             price (float): Order price (0-1 range for prediction markets)
-            size (float): Order size in USDC
+            size (float): Order size in USDC (will be converted to token amount for BUY orders)
             neg_risk (bool, optional): Whether this is a negative risk market. Defaults to False.
             
         Returns:
             dict: Response from the API containing order details, or empty dict on error
         """
+        # IMPORTANT: OrderArgs.size is TOKEN AMOUNT, not USDC amount
+        # For BUY orders: token_amount = usdc_amount / price
+        # For SELL orders: token_amount = usdc_amount / price (same calculation)
+        if action.upper() == "BUY":
+            # Convert USDC amount to token amount
+            token_size = size / price
+        else:  # SELL
+            # For SELL, size is also in USDC, convert to tokens
+            token_size = size / price
+        
         # Create order parameters
         order_args = OrderArgs(
             token_id=str(marketId),
             price=price,
-            size=size,
+            size=token_size,  # Use token amount, not USDC
             side=action
         )
 

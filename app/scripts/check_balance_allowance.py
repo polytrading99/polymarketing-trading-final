@@ -34,7 +34,7 @@ ERC20_ABI = [
 USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"  # USDC.e
 POLYMARKET_CONTRACTS = {
     'exchange': '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
-    'neg_risk_adapter': '0xd91E80cF2E7be2e162c6513ceD06f1D0dA35296',
+    'neg_risk_adapter': '0xd91E80cF2E7be2e162c6513ceD06f1D0dA35296',  # Note: This address may have checksum issues
     'exchange_v2': '0xC5d563A36AE78145C45a50134d48A1215220f80a',
 }
 
@@ -91,24 +91,31 @@ def main():
     max_uint = 2**256 - 1
     
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
-        # Convert to lowercase first, then checksum to avoid format errors
-        contract_addr_lower = contract_addr.lower()
-        contract_addr_checksum = Web3.to_checksum_address(contract_addr_lower)
-        allowance_raw = usdc_contract.functions.allowance(proxy_address, contract_addr_checksum).call()
-        allowance_usd = allowance_raw / 10**6
-        
-        if allowance_raw >= max_uint - 1000:
-            status = "✅ APPROVED (max)"
-        elif allowance_usd >= balance_usd:
-            status = f"✅ APPROVED (${allowance_usd:.2f})"
-        elif allowance_usd > 0:
-            status = f"⚠️  PARTIAL (${allowance_usd:.2f})"
-        else:
-            status = "❌ NOT APPROVED"
-        
-        print(f"{name:20} ({contract_addr[:10]}...): {status}")
-        if allowance_usd > 0:
-            print(f"   Allowance: ${allowance_usd:.2f} USDC")
+        try:
+            # Convert to lowercase first, then checksum to avoid format errors
+            contract_addr_lower = contract_addr.lower()
+            contract_addr_checksum = Web3.to_checksum_address(contract_addr_lower)
+            allowance_raw = usdc_contract.functions.allowance(proxy_address, contract_addr_checksum).call()
+            allowance_usd = allowance_raw / 10**6
+            
+            if allowance_raw >= max_uint - 1000:
+                status = "✅ APPROVED (max)"
+            elif allowance_usd >= balance_usd:
+                status = f"✅ APPROVED (${allowance_usd:.2f})"
+            elif allowance_usd > 0:
+                status = f"⚠️  PARTIAL (${allowance_usd:.2f})"
+            else:
+                status = "❌ NOT APPROVED"
+            
+            print(f"{name:20} ({contract_addr[:10]}...): {status}")
+            if allowance_usd > 0:
+                print(f"   Allowance: ${allowance_usd:.2f} USDC")
+        except ValueError as e:
+            # Handle checksumming errors gracefully
+            print(f"{name:20} ({contract_addr[:10]}...): ⚠️  ERROR - {str(e)[:50]}")
+            print(f"   (Address format issue - may need manual verification)")
+        except Exception as e:
+            print(f"{name:20} ({contract_addr[:10]}...): ❌ ERROR - {e}")
     
     # Summary
     print(f"\n{'='*70}")
