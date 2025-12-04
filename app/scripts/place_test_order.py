@@ -71,7 +71,22 @@ async def main() -> None:
     
     print("Fetching markets from Polymarket...")
     
-    # Find market
+    # Initialize client first to check balance
+    try:
+        client = PolymarketClient()
+    except Exception as e:
+        print(f"ERROR: Failed to initialize PolymarketClient: {e}")
+        return
+    
+    # Check balance first
+    try:
+        usdc_balance = client.get_usdc_balance()
+        print(f"USDC Balance: ${usdc_balance:.2f}")
+    except Exception as e:
+        print(f"⚠️  Could not check balance: {e}")
+        usdc_balance = 5.0  # Fallback minimum
+    
+    # Find market that fits balance
     market = None
     if search_text:
         print(f"Searching for market containing: '{search_text}'")
@@ -81,14 +96,30 @@ async def main() -> None:
             print("Try a shorter search term or check the market name on polymarket.com")
             return
     else:
-        # Use first market from API
+        # Search for a market that fits the balance
+        print(f"Searching for market with minimum ≤ ${usdc_balance:.2f}...")
         try:
             markets = clob_client.get_sampling_markets()
-            if markets and 'data' in markets and len(markets['data']) > 0:
-                market = markets['data'][0]
-            else:
+            if not markets or 'data' not in markets:
                 print("ERROR: No markets found from Polymarket API")
                 return
+            
+            # Find first market with min_size <= balance
+            for m in markets['data']:
+                rewards = m.get('rewards', {})
+                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
+                if min_size <= usdc_balance:
+                    market = m
+                    print(f"✅ Found market with min_size ${min_size} (fits balance)")
+                    break
+            
+            # If no market fits, use first one and warn
+            if not market:
+                market = markets['data'][0]
+                rewards = market.get('rewards', {})
+                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
+                print(f"⚠️  No market found with min_size ≤ ${usdc_balance:.2f}")
+                print(f"   Using first market (min_size: ${min_size}) - order will likely fail")
         except Exception as e:
             print(f"ERROR: Failed to fetch markets: {e}")
             return
@@ -125,15 +156,7 @@ async def main() -> None:
     print(f"  Min Order Size: {min_size} USDC")
     print(f"{'='*60}\n")
     
-    # Initialize Polymarket client
-    try:
-        client = PolymarketClient()
-    except Exception as e:
-        print(f"ERROR: Failed to initialize PolymarketClient: {e}")
-        print("\nMake sure:")
-        print("  1. PK is set in .env (64 hex chars, no 0x prefix)")
-        print("  2. BROWSER_ADDRESS is set in .env (0x + 40 hex chars)")
-        return
+    # Client already initialized above for balance check
     
     # Get current order book to find a reasonable price
     try:
