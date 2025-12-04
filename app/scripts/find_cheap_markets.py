@@ -42,7 +42,10 @@ def main():
             checked += 1
             rewards = market.get('rewards', {})
             min_size_raw = rewards.get('min_size')
-            is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
+            max_spread = rewards.get('max_spread')
+            
+            # Determine if neg-risk: has min_size OR max_spread in rewards
+            is_neg_risk = bool(min_size_raw or max_spread)
             
             # Regular markets (non-neg-risk) typically have $1 minimum
             # They don't have min_size in rewards, so min_size is None/0
@@ -56,6 +59,10 @@ def main():
                 if min_size <= max_price:
                     found_markets.append((market, min_size, True))
             # If neg-risk but no min_size, skip (likely has high minimum)
+            
+            # Show progress every 100 markets
+            if checked % 100 == 0:
+                print(f"   Checked {checked} markets, found {len(found_markets)} so far...")
         
         # Sort by min_size (lowest first)
         found_markets.sort(key=lambda x: x[1])

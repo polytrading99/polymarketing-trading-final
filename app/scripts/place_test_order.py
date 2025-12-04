@@ -286,12 +286,19 @@ async def main() -> None:
             # Use the smaller of: min_size or max_usdc
             usdc_to_spend = min(min_size, max_usdc)
         
-        # Calculate max USDC we can spend (90% of balance, but respect min_size)
-        max_usdc = min(usdc_balance * 0.9, 10.0)  # Cap at 10 USDC for testing
-        max_usdc = max(max_usdc, min_size)  # At least meet minimum
+        # Calculate max USDC we can spend (90% of balance for safety)
+        max_usdc = usdc_balance * 0.9
         
-        # Use the smaller of: min_size or max_usdc
-        usdc_to_spend = min(min_size, max_usdc)
+        # For testing: use available balance, not market minimum
+        # If market minimum is too high, use what we have
+        if min_size > usdc_balance:
+            # Market requires more than we have - use 90% of balance for testing
+            usdc_to_spend = max_usdc
+            print(f"   Market requires ${min_size}, but we only have ${usdc_balance:.2f}")
+            print(f"   Using ${usdc_to_spend:.2f} for testing (may fail if market enforces minimum)")
+        else:
+            # We have enough - use the smaller of: min_size or max_usdc
+            usdc_to_spend = min(min_size, max_usdc)
         
         # Convert USDC amount to token amount: tokens = usdc / price
         # For BUY orders, we're buying tokens, so size = usdc_amount / price
