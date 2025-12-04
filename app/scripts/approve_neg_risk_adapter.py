@@ -111,23 +111,24 @@ def main():
     adapter_checksum = Web3.to_checksum_address(NEG_RISK_ADAPTER)
     
     # 1. Approve USDC
-    # NOTE: Approvals must be from the PROXY address, not MetaMask wallet
-    # But we sign with MetaMask wallet. If proxy is different, we need to check
+    # NOTE: We sign from MetaMask wallet, but the proxy controls funds
+    # The proxy inherits approvals from the controlling wallet
     print(f"\n{'='*70}")
     print("1. Approving USDC for Neg Risk Adapter...")
     print("="*70)
-    print(f"   Approving FROM: {proxy_address}")
+    print(f"   Signing FROM: {pub_key} (MetaMask wallet)")
+    print(f"   Proxy (holds funds): {proxy_address}")
     print(f"   Approving TO: {adapter_checksum}")
     
     try:
-        # Use proxy address for the approval (where funds are)
-        nonce = web3.eth.get_transaction_count(proxy_address)
+        # Sign from MetaMask wallet (proxy inherits the approval)
+        nonce = web3.eth.get_transaction_count(pub_key)
         raw_txn = usdc_contract.functions.approve(
             adapter_checksum,
             int(MAX_INT, 0)
         ).build_transaction({
             "chainId": 137,
-            "from": proxy_address,  # Approve from proxy (where USDC is)
+            "from": pub_key,  # Sign from MetaMask wallet
             "nonce": nonce,
             "gasPrice": web3.eth.gas_price,
         })
@@ -162,18 +163,19 @@ def main():
     print(f"\n{'='*70}")
     print("2. Approving Conditional Tokens (ERC1155) for Neg Risk Adapter...")
     print("="*70)
-    print(f"   Approving FROM: {proxy_address}")
+    print(f"   Signing FROM: {pub_key} (MetaMask wallet)")
+    print(f"   Proxy (holds funds): {proxy_address}")
     print(f"   Approving TO: {adapter_checksum}")
     
     try:
-        # Use proxy address for the approval
-        nonce = web3.eth.get_transaction_count(proxy_address)
+        # Sign from MetaMask wallet (proxy inherits the approval)
+        nonce = web3.eth.get_transaction_count(pub_key)
         raw_txn = ctf_contract.functions.setApprovalForAll(
             adapter_checksum,
             True
         ).build_transaction({
             "chainId": 137,
-            "from": proxy_address,  # Approve from proxy
+            "from": pub_key,  # Sign from MetaMask wallet
             "nonce": nonce,
             "gasPrice": web3.eth.gas_price,
         })
