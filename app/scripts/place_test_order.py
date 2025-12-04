@@ -104,52 +104,97 @@ async def main() -> None:
                 print("ERROR: No markets found from Polymarket API")
                 return
             
-            # Find first market with min_size <= balance
-            # Check up to 500 markets to find one that fits
-            max_markets_to_check = 500
+            # Find first REGULAR market (non-neg-risk) which has $1 minimum
+            # Keep searching through ALL markets until we find one
             markets_checked = 0
+            all_markets = markets['data']
             
-            # Priority: look for markets with NO min_size first (defaults to $1-5)
-            # Then look for markets with min_size <= balance
-            best_market = None
-            best_min_size = float('inf')
+            print(f"   Searching through ALL markets for a REGULAR (non-neg-risk) market...")
+            print(f"   (Regular markets have $1 minimum, perfect for testing)\n")
             
-            for m in markets['data'][:max_markets_to_check]:
+            # First pass: look for regular markets (non-neg-risk) in current batch
+            for m in all_markets:
                 markets_checked += 1
                 rewards = m.get('rewards', {})
-                
-                # Check if it's a regular market (non-neg-risk)
-                is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
                 min_size_raw = rewards.get('min_size')
+                max_spread = rewards.get('max_spread')
+                is_neg_risk = bool(min_size_raw or max_spread)
                 
                 if not is_neg_risk:
-                    # Regular market - standard minimum is $1
-                    min_size = 1.0
-                    if min_size <= usdc_balance:
-                        market = m
-                        print(f"✅ Found REGULAR market (min_size: $1.00)")
-                        print(f"   Checked {markets_checked} markets")
-                        break
-                elif min_size_raw:
-                    # Neg-risk market with explicit min_size
-                    min_size = float(min_size_raw)
-                else:
-                    # Neg-risk but no min_size - skip (likely high minimum)
-                    continue
-                
-                # Track best market (lowest min_size)
-                if min_size < best_min_size:
-                    best_min_size = min_size
-                    best_market = m
-                
-                # If this market fits, use it
-                if min_size <= usdc_balance:
+                    # Found a regular market! These have $1 minimum
                     market = m
-                    print(f"✅ Found market with min_size ${min_size} (fits balance)")
+                    print(f"✅ Found REGULAR market (min_size: $1.00)")
                     print(f"   Checked {markets_checked} markets")
                     break
+                
+                # Show progress every 200 markets
+                if markets_checked % 200 == 0:
+                    print(f"   Checked {markets_checked} markets... still searching...")
             
-            # If still no market found, we've exhausted the list
+            # If no regular market found, try pagination to get more markets
+            if not market:
+                print(f"\n   No regular markets found in first {markets_checked} markets")
+                print(f"   Trying to fetch more markets with pagination...\n")
+                
+                cursor = markets.get('next_cursor')
+                max_pages = 10  # Check up to 10 pages
+                page = 0
+                
+                while cursor and page < max_pages and not market:
+                    page += 1
+                    try:
+                        more_markets = clob_client.get_sampling_markets(next_cursor=cursor)
+                        if not more_markets or 'data' not in more_markets:
+                            break
+                        
+                        for m in more_markets['data']:
+                            markets_checked += 1
+                            rewards = m.get('rewards', {})
+                            min_size_raw = rewards.get('min_size')
+                            max_spread = rewards.get('max_spread')
+                            is_neg_risk = bool(min_size_raw or max_spread)
+                            
+                            if not is_neg_risk:
+                                market = m
+                                print(f"✅ Found REGULAR market (min_size: $1.00)")
+                                print(f"   Checked {markets_checked} markets across {page+1} pages")
+                                break
+                        
+                        cursor = more_markets.get('next_cursor')
+                        if markets_checked % 200 == 0:
+                            print(f"   Checked {markets_checked} markets across {page+1} pages...")
+                    except Exception as e:
+                        print(f"   Error fetching page {page+1}: {e}")
+                        break
+            
+            # If still no regular market, try neg-risk markets with low min_size
+            if not market:
+                print(f"\n   No regular markets found after checking {markets_checked} markets")
+                print(f"   Searching for neg-risk markets with low minimum...\n")
+                
+                best_market = None
+                best_min_size = float('inf')
+                
+                for m in all_markets:
+                    rewards = m.get('rewards', {})
+                    min_size_raw = rewards.get('min_size')
+                    if min_size_raw:
+                        min_size = float(min_size_raw)
+                        if min_size < best_min_size:
+                            best_min_size = min_size
+                            best_market = m
+                        if min_size <= usdc_balance:
+                            market = m
+                            print(f"✅ Found neg-risk market with min_size ${min_size} (fits balance)")
+                            break
+                
+                if not market and best_market:
+                    market = best_market
+                    print(f"⚠️  Using neg-risk market with lowest min_size: ${best_min_size}")
+                    if best_min_size > usdc_balance:
+                        print(f"   This is above your balance - order will likely fail")
+            
+            # Final check
             if not market:
                 print(f"\n❌ ERROR: Could not find any suitable market after checking {markets_checked} markets")
                 print(f"   This is unusual - most markets should be regular (non-neg-risk) with $1 minimum")
