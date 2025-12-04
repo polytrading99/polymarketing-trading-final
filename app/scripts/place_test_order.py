@@ -166,19 +166,20 @@ async def main() -> None:
         usdc_balance = client.get_usdc_balance()
         print(f"USDC Balance: ${usdc_balance:.2f}")
         
-        # Calculate max USDC we can spend (90% of balance, but at least $5)
-        max_usdc = min(usdc_balance * 0.9, 10.0)  # Cap at 10 USDC for testing
-        max_usdc = max(max_usdc, 5.0)  # At least $5
-        
         # Check if we can meet market minimum
         if min_size > usdc_balance:
-            print(f"❌ ERROR: Market requires ${min_size} USDC minimum")
+            print(f"\n❌ ERROR: Market requires ${min_size} USDC minimum")
             print(f"   But you only have ${usdc_balance:.2f} USDC")
             print(f"   Cannot place order on this market")
-            print(f"\n   Solution:")
-            print(f"   1. Find a market with lower minimum (try searching)")
-            print(f"   2. Or add more USDC to your wallet")
+            print(f"\n   Solutions:")
+            print(f"   1. Search for a market with lower minimum:")
+            print(f"      docker exec -it BACKEND_CONTAINER python -m app.scripts.place_test_order \"search term\"")
+            print(f"   2. Or add more USDC to your wallet: {client.browser_wallet}")
             return
+        
+        # Calculate max USDC we can spend (90% of balance, but respect min_size)
+        max_usdc = min(usdc_balance * 0.9, 10.0)  # Cap at 10 USDC for testing
+        max_usdc = max(max_usdc, min_size)  # At least meet minimum
         
         # Use the smaller of: min_size or max_usdc
         usdc_to_spend = min(min_size, max_usdc)
