@@ -105,14 +105,42 @@ async def main() -> None:
                 return
             
             # Find first market with min_size <= balance
-            # Check up to 200 markets to find one that fits
-            max_markets_to_check = 200
+            # Check up to 500 markets to find one that fits
+            max_markets_to_check = 500
             markets_checked = 0
+            
+            # Priority: look for markets with NO min_size first (defaults to $1-5)
+            # Then look for markets with min_size <= balance
+            best_market = None
+            best_min_size = float('inf')
             
             for m in markets['data'][:max_markets_to_check]:
                 markets_checked += 1
                 rewards = m.get('rewards', {})
-                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
+                
+                # If no min_size in rewards, it might be a regular market (lower minimum)
+                if not rewards.get('min_size'):
+                    # Regular markets often have $1-5 minimum
+                    # Check if it's actually a neg-risk market
+                    is_neg_risk = bool(rewards.get('max_spread'))
+                    if not is_neg_risk:
+                        # Regular market - likely has $1-5 minimum, try it
+                        market = m
+                        print(f"✅ Found REGULAR market (no min_size specified, likely $1-5 minimum)")
+                        print(f"   Checked {markets_checked} markets")
+                        break
+                    else:
+                        # Neg-risk but no min_size - might still work
+                        min_size = 5.0  # Assume $5 default
+                else:
+                    min_size = float(rewards.get('min_size'))
+                
+                # Track best market (lowest min_size)
+                if min_size < best_min_size:
+                    best_min_size = min_size
+                    best_market = m
+                
+                # If this market fits, use it
                 if min_size <= usdc_balance:
                     market = m
                     print(f"✅ Found market with min_size ${min_size} (fits balance)")
@@ -140,26 +168,30 @@ async def main() -> None:
                 except:
                     pass
             
-            # If still no market fits, use first one with lowest min_size
-            if not market:
-                # Find market with lowest min_size
-                best_market = None
-                lowest_min = float('inf')
-                for m in markets['data'][:50]:
-                    rewards = m.get('rewards', {})
-                    min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
-                    if min_size < lowest_min:
-                        lowest_min = min_size
-                        best_market = m
-                
-                if best_market:
-                    market = best_market
-                    print(f"⚠️  Using market with lowest min_size: ${lowest_min}")
-                    print(f"   This is still above your balance - order will likely fail")
+            # If still no market fits, try the best one we found
+            if not market and best_market:
+                market = best_market
+                rewards = market.get('rewards', {})
+                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
+                print(f"⚠️  Using market with lowest min_size found: ${min_size}")
+                if min_size > usdc_balance:
+                    print(f"   This is still above your balance (${usdc_balance:.2f})")
+                    print(f"   But we'll try anyway - some markets may accept smaller orders")
                 else:
+                    print(f"   This should work!")
+            elif not market:
+                # Last resort: try first regular (non-neg-risk) market
+                for m in markets['data'][:100]:
+                    rewards = m.get('rewards', {})
+                    is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
+                    if not is_neg_risk:
+                        market = m
+                        print(f"✅ Found regular market (no neg-risk, likely lower minimum)")
+                        break
+                
+                if not market:
                     market = markets['data'][0]
-                    print(f"❌ Could not find suitable market")
-                    print(f"   You may need to add more USDC to your wallet")
+                    print(f"⚠️  Using first available market (may have high minimum)")
         except Exception as e:
             print(f"ERROR: Failed to fetch markets: {e}")
             return
@@ -230,15 +262,18 @@ async def main() -> None:
         print(f"USDC Balance: ${usdc_balance:.2f}")
         
         # Check if we can meet market minimum
+        # For testing, try with smaller amount even if below minimum
+        # Some markets may accept it, or we'll get a clear error
         if min_size > usdc_balance:
-            print(f"\n❌ ERROR: Market requires ${min_size} USDC minimum")
+            print(f"\n⚠️  WARNING: Market requires ${min_size} USDC minimum")
             print(f"   But you only have ${usdc_balance:.2f} USDC")
-            print(f"   Cannot place order on this market")
-            print(f"\n   Solutions:")
-            print(f"   1. Search for a market with lower minimum:")
-            print(f"      docker exec -it BACKEND_CONTAINER python -m app.scripts.place_test_order \"search term\"")
-            print(f"   2. Or add more USDC to your wallet: {client.browser_wallet}")
-            return
+            print(f"   Attempting with ${usdc_balance * 0.9:.2f} USDC anyway (for testing)")
+            print(f"   If it fails, you'll need to add more USDC or find a market with lower minimum")
+            # Use 90% of balance for testing
+            usdc_to_spend = usdc_balance * 0.9
+        else:
+            # Use the smaller of: min_size or max_usdc
+            usdc_to_spend = min(min_size, max_usdc)
         
         # Calculate max USDC we can spend (90% of balance, but respect min_size)
         max_usdc = min(usdc_balance * 0.9, 10.0)  # Cap at 10 USDC for testing
