@@ -105,21 +105,61 @@ async def main() -> None:
                 return
             
             # Find first market with min_size <= balance
-            for m in markets['data']:
+            # Check up to 200 markets to find one that fits
+            max_markets_to_check = 200
+            markets_checked = 0
+            
+            for m in markets['data'][:max_markets_to_check]:
+                markets_checked += 1
                 rewards = m.get('rewards', {})
                 min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
                 if min_size <= usdc_balance:
                     market = m
                     print(f"✅ Found market with min_size ${min_size} (fits balance)")
+                    print(f"   Checked {markets_checked} markets")
                     break
             
-            # If no market fits, use first one and warn
+            # If no market fits, try to get more markets
             if not market:
-                market = markets['data'][0]
-                rewards = market.get('rewards', {})
-                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
-                print(f"⚠️  No market found with min_size ≤ ${usdc_balance:.2f}")
-                print(f"   Using first market (min_size: ${min_size}) - order will likely fail")
+                print(f"⚠️  No market found in first {markets_checked} markets with min_size ≤ ${usdc_balance:.2f}")
+                print(f"   Trying to fetch more markets...")
+                
+                # Try to get more markets with cursor
+                try:
+                    cursor = markets.get('next_cursor')
+                    if cursor:
+                        more_markets = clob_client.get_sampling_markets(next_cursor=cursor)
+                        if more_markets and 'data' in more_markets:
+                            for m in more_markets['data'][:100]:
+                                rewards = m.get('rewards', {})
+                                min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
+                                if min_size <= usdc_balance:
+                                    market = m
+                                    print(f"✅ Found market with min_size ${min_size} (fits balance)")
+                                    break
+                except:
+                    pass
+            
+            # If still no market fits, use first one with lowest min_size
+            if not market:
+                # Find market with lowest min_size
+                best_market = None
+                lowest_min = float('inf')
+                for m in markets['data'][:50]:
+                    rewards = m.get('rewards', {})
+                    min_size = float(rewards.get('min_size', 5.0)) if rewards.get('min_size') else 5.0
+                    if min_size < lowest_min:
+                        lowest_min = min_size
+                        best_market = m
+                
+                if best_market:
+                    market = best_market
+                    print(f"⚠️  Using market with lowest min_size: ${lowest_min}")
+                    print(f"   This is still above your balance - order will likely fail")
+                else:
+                    market = markets['data'][0]
+                    print(f"❌ Could not find suitable market")
+                    print(f"   You may need to add more USDC to your wallet")
         except Exception as e:
             print(f"ERROR: Failed to fetch markets: {e}")
             return
