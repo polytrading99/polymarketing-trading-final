@@ -91,7 +91,9 @@ def main():
     max_uint = 2**256 - 1
     
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
-        contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+        # Convert to lowercase first, then checksum to avoid format errors
+        contract_addr_lower = contract_addr.lower()
+        contract_addr_checksum = Web3.to_checksum_address(contract_addr_lower)
         allowance_raw = usdc_contract.functions.allowance(proxy_address, contract_addr_checksum).call()
         allowance_usd = allowance_raw / 10**6
         
@@ -123,7 +125,9 @@ def main():
     # Check if all contracts are approved
     all_approved = True
     for name, contract_addr in POLYMARKET_CONTRACTS.items():
-        contract_addr_checksum = Web3.to_checksum_address(contract_addr)
+        # Convert to lowercase first, then checksum to avoid format errors
+        contract_addr_lower = contract_addr.lower()
+        contract_addr_checksum = Web3.to_checksum_address(contract_addr_lower)
         allowance_raw = usdc_contract.functions.allowance(proxy_address, contract_addr_checksum).call()
         if allowance_raw < max_uint - 1000:
             all_approved = False
