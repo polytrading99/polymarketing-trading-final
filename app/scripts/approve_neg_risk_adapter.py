@@ -108,7 +108,8 @@ def main():
         abi=ERC1155_SET_APPROVAL_ABI
     )
     
-    adapter_checksum = Web3.to_checksum_address(NEG_RISK_ADAPTER)
+    # Fix checksumming - convert to lowercase first
+    adapter_checksum = Web3.to_checksum_address(NEG_RISK_ADAPTER.lower())
     
     # 1. Approve USDC
     # NOTE: We sign from MetaMask wallet, but the proxy controls funds
