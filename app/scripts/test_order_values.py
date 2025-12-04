@@ -66,11 +66,27 @@ def main():
         print(f"Min Size: {min_size} USDC")
         print(f"Neg Risk: {is_neg_risk}\n")
         
+        # Check balance first
+        try:
+            from poly_data.polymarket_client import PolymarketClient
+            balance_client = PolymarketClient()
+            usdc_balance = balance_client.get_usdc_balance()
+            print(f"\nUSDC Balance: ${usdc_balance:.2f}")
+            
+            # Use smaller of: min_size, balance, or 10 USDC
+            order_size = min(max(min_size, 5.0), max(usdc_balance * 0.9, 5.0), 10.0)
+            if order_size > usdc_balance:
+                print(f"⚠️  Order size {order_size} exceeds balance {usdc_balance}, using {usdc_balance * 0.9:.2f}")
+                order_size = max(usdc_balance * 0.9, 5.0)
+        except:
+            # Fallback to min_size or 5 USDC
+            order_size = max(min_size, 5.0)
+        
         # Create order
         order_args = OrderArgs(
             token_id=str(token_yes),
             price=0.5,
-            size=max(min_size, 5.0),
+            size=order_size,
             side="BUY"
         )
         
@@ -94,6 +110,7 @@ def main():
             print(f"Token ID: {values.get('tokenId')}")
             print(f"Price: {values.get('makerAmount')} / {values.get('takerAmount')} = {values.get('makerAmount') / values.get('takerAmount')}")
             print(f"Size: {values.get('makerAmount') / 1e6} USDC")
+            print(f"Order Size Used: {order_size} USDC")
             
             # Verify addresses match
             print(f"\n{'='*70}")
