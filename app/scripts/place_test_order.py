@@ -118,22 +118,24 @@ async def main() -> None:
                 markets_checked += 1
                 rewards = m.get('rewards', {})
                 
-                # If no min_size in rewards, it might be a regular market (lower minimum)
-                if not rewards.get('min_size'):
-                    # Regular markets often have $1-5 minimum
-                    # Check if it's actually a neg-risk market
-                    is_neg_risk = bool(rewards.get('max_spread'))
-                    if not is_neg_risk:
-                        # Regular market - likely has $1-5 minimum, try it
+                # Check if it's a regular market (non-neg-risk)
+                is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
+                min_size_raw = rewards.get('min_size')
+                
+                if not is_neg_risk:
+                    # Regular market - standard minimum is $1
+                    min_size = 1.0
+                    if min_size <= usdc_balance:
                         market = m
-                        print(f"✅ Found REGULAR market (no min_size specified, likely $1-5 minimum)")
+                        print(f"✅ Found REGULAR market (min_size: $1.00)")
                         print(f"   Checked {markets_checked} markets")
                         break
-                    else:
-                        # Neg-risk but no min_size - might still work
-                        min_size = 5.0  # Assume $5 default
+                elif min_size_raw:
+                    # Neg-risk market with explicit min_size
+                    min_size = float(min_size_raw)
                 else:
-                    min_size = float(rewards.get('min_size'))
+                    # Neg-risk but no min_size - skip (likely high minimum)
+                    continue
                 
                 # Track best market (lowest min_size)
                 if min_size < best_min_size:
@@ -211,12 +213,21 @@ async def main() -> None:
     
     # Check if neg_risk (has rewards) and get minimum order size
     rewards = market.get('rewards', {})
-    neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
-    min_size = rewards.get('min_size', 0)  # Get minimum order size from market
-    if min_size and min_size > 0:
-        min_size = float(min_size)
+    is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
+    min_size_raw = rewards.get('min_size')
+    
+    # Regular markets (non-neg-risk) typically have $1 minimum
+    # Neg-risk markets have min_size in rewards (often $20-200)
+    if is_neg_risk and min_size_raw:
+        min_size = float(min_size_raw)
+    elif not is_neg_risk:
+        # Regular market - standard minimum is $1
+        min_size = 1.0
     else:
-        min_size = 5.0  # Default minimum is usually 5 USDC
+        # Neg-risk but no min_size specified - assume $5
+        min_size = 5.0
+    
+    neg_risk = is_neg_risk
     
     print(f"\n{'='*60}")
     print(f"Selected Market:")

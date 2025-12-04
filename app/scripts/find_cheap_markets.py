@@ -41,15 +41,21 @@ def main():
         for market in markets['data'][:max_to_check]:
             checked += 1
             rewards = market.get('rewards', {})
-            min_size = float(rewards.get('min_size', 0)) if rewards.get('min_size') else 0
+            min_size_raw = rewards.get('min_size')
             is_neg_risk = bool(rewards.get('min_size') or rewards.get('max_spread'))
             
-            # Regular markets (no min_size) often have $1-5 minimum
-            if not min_size and not is_neg_risk:
-                min_size = 5.0  # Assume $5 for regular markets
+            # Regular markets (non-neg-risk) typically have $1 minimum
+            # They don't have min_size in rewards, so min_size is None/0
+            if not is_neg_risk:
+                # Regular market - assume $1 minimum (standard for Polymarket)
+                min_size = 1.0
                 found_markets.append((market, min_size, False))
-            elif min_size > 0 and min_size <= max_price:
-                found_markets.append((market, min_size, is_neg_risk))
+            elif min_size_raw:
+                # Neg-risk market with explicit min_size
+                min_size = float(min_size_raw)
+                if min_size <= max_price:
+                    found_markets.append((market, min_size, True))
+            # If neg-risk but no min_size, skip (likely has high minimum)
         
         # Sort by min_size (lowest first)
         found_markets.sort(key=lambda x: x[1])
