@@ -159,13 +159,31 @@ async def main() -> None:
         print("Using default price 0.5")
         price = 0.5
     
-    # Use minimum order size (from market requirements)
-    size = max(min_size, 5.0)  # At least 5 USDC, or market minimum if higher
+    # Check balance and use appropriate order size
+    try:
+        usdc_balance = client.get_usdc_balance()
+        print(f"USDC Balance: ${usdc_balance:.2f}")
+        
+        # Use smaller of: min_size, 90% of balance, or 10 USDC max for testing
+        size = min(max(min_size, 5.0), max(usdc_balance * 0.9, 5.0), 10.0)
+        
+        if size > usdc_balance:
+            print(f"⚠️  Warning: Order size {size} exceeds balance {usdc_balance}")
+            print(f"   Using {usdc_balance * 0.9:.2f} USDC instead")
+            size = max(usdc_balance * 0.9, 5.0)
+        
+        if size < min_size:
+            print(f"⚠️  Warning: Order size {size} is below market minimum {min_size}")
+            print(f"   This order may be rejected by Polymarket")
+    except Exception as e:
+        print(f"⚠️  Could not check balance: {e}")
+        # Fallback to min_size or 5 USDC
+        size = max(min_size, 5.0)
     
     print(f"\nPlacing REAL BUY order:")
     print(f"  Token: {token_yes}")
     print(f"  Price: {price}")
-    print(f"  Size: {size} USDC (minimum required: {min_size} USDC)")
+    print(f"  Size: {size} USDC (market minimum: {min_size} USDC)")
     print(f"  Neg Risk: {neg_risk}")
     print()
     
