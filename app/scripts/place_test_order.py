@@ -272,33 +272,20 @@ async def main() -> None:
         usdc_balance = client.get_usdc_balance()
         print(f"USDC Balance: ${usdc_balance:.2f}")
         
-        # Check if we can meet market minimum
-        # For testing, try with smaller amount even if below minimum
-        # Some markets may accept it, or we'll get a clear error
+        # For testing: ALWAYS use your available balance (90% for safety)
+        # Don't try to meet market minimum if you don't have enough
+        max_usdc = usdc_balance * 0.9  # Use 90% of balance for safety
+        
         if min_size > usdc_balance:
             print(f"\n⚠️  WARNING: Market requires ${min_size} USDC minimum")
             print(f"   But you only have ${usdc_balance:.2f} USDC")
-            print(f"   Attempting with ${usdc_balance * 0.9:.2f} USDC anyway (for testing)")
-            print(f"   If it fails, you'll need to add more USDC or find a market with lower minimum")
-            # Use 90% of balance for testing
-            usdc_to_spend = usdc_balance * 0.9
-        else:
-            # Use the smaller of: min_size or max_usdc
-            usdc_to_spend = min(min_size, max_usdc)
-        
-        # Calculate max USDC we can spend (90% of balance for safety)
-        max_usdc = usdc_balance * 0.9
-        
-        # For testing: use available balance, not market minimum
-        # If market minimum is too high, use what we have
-        if min_size > usdc_balance:
-            # Market requires more than we have - use 90% of balance for testing
+            print(f"   Using ${max_usdc:.2f} USDC for testing (90% of your balance)")
+            print(f"   Order may fail if market enforces minimum, but we'll try anyway")
             usdc_to_spend = max_usdc
-            print(f"   Market requires ${min_size}, but we only have ${usdc_balance:.2f}")
-            print(f"   Using ${usdc_to_spend:.2f} for testing (may fail if market enforces minimum)")
         else:
-            # We have enough - use the smaller of: min_size or max_usdc
+            # We have enough - use smaller of: min_size or max_usdc
             usdc_to_spend = min(min_size, max_usdc)
+            print(f"   Will use ${usdc_to_spend:.2f} USDC")
         
         # Convert USDC amount to token amount: tokens = usdc / price
         # For BUY orders, we're buying tokens, so size = usdc_amount / price
