@@ -1,0 +1,108 @@
+{
+  "elon_tweet_bot": {
+    "ENABLE_TRADING": true,
+    "TEST_TOP_BRACKET_ONLY": true,
+    "POLL_INTERVAL_SEC": 30,
+    "SEARCH_KEYWORDS": ["elon", "musk", "tweet"],
+    "LIMIT_PRICE": 0.04,
+    "INVEST_PER_MARKET_USD": 0,
+    "MIN_BRACKET_START": 40,
+    "ORDER_STATE_FILE": "elon_tweet_orders.json"
+  },
+
+  "api": {
+    "PRIVATE_KEY": "API",
+    "PROXY_ADDRESS": "WALLET API",
+    "SIGNATURE_TYPE": 1,
+    "CHAIN_ID": 137
+  },
+
+  "strategies": {
+    "strategy_1": {
+      "ENABLED": true,
+
+      "entry_exit": {
+        "ENTRY_BID_THRESHOLD": 0.6,
+        "MIN_TP_INCREMENT": 0.01,
+        "SL_OFFSET": 0.2,
+        "SL_FLOOR": 0.5,
+        "MAX_TP_PRICE": 0.99,
+        "SL_ORDER_PRICE": 0.01,
+
+        "EXIT_DELAY_SEC": 1.0,
+        "EXIT_RETRY_DELAY_SEC": 1.0,
+        "EXIT_PRICE_DRIFT_THRESHOLD": 0.02,
+        "MIN_EXIT_PRICE_MODE": "ENTRY_PLUS_INCREMENT"
+      },
+
+      "time_windows": {
+        "CONTRACT_DURATION_SEC": 900,
+        "LATE_WINDOW_SEC": 120,
+        "ENTRY_REQUOTE_WAIT_SEC": 2.0
+      },
+
+      "late_mode": {
+        "LATE_SL_TRIGGER": 0.7,
+        "LATE_REENTRY_ENTRY_THRESHOLD": 0.9,
+        "ENABLE_LATE_REENTRY": true,
+        "MAX_LATE_REENTRIES": 1
+      },
+
+      "position_control": {
+        "CAP_SCHEDULE": [
+          {
+            "start_sec": 0,
+            "end_sec": 300,
+            "cap_usd": 12.0
+          },
+          {
+            "start_sec": 300,
+            "end_sec": 600,
+            "cap_usd": 14.0
+          },
+          {
+            "start_sec": 600,
+            "end_sec": 900,
+            "cap_usd": 16.0
+          }
+        ],
+        "MIN_TRADE_SIZE": 10.0,
+        "ENABLE_DUST_MERGE": true
+      },
+
+      "micro_tuning": {
+        "ENTRY_REQUOTE_MIN_IMPROVE": 0.03,
+        "REMOTE_POS_SIZE_THRESHOLD": 0.0,
+        "LEG_SELECTION_MODE": "HIGHEST_BID"
+      }
+    },
+
+    "strategy_2": {
+      "ENABLED": false,
+
+      "core": {
+        "ASK_ENTRY_THRESHOLD": 0.9,
+        "TIME_TO_EXPIRY_SEC": 420,
+        "TARGET_POSITION_USD": 100.0
+      },
+
+      "risk": {
+        "SL_PRICE": 0.7
+      },
+
+      "position_control": {
+        "MIN_TRADE_SIZE": 10.0
+      },
+
+      "entry_exit": {
+        "MIN_TP_INCREMENT": 0.01,
+        "MAX_TP_PRICE": 0.99,
+        "SL_ORDER_PRICE": 0.01,
+        "EXIT_DELAY_SEC": 1.0,
+        "EXIT_RETRY_DELAY_SEC": 1.0,
+        "EXIT_PRICE_DRIFT_THRESHOLD": 0.02,
+        "MIN_EXIT_PRICE_MODE": "HOLD_TO_EXPIRY_OR_SL"
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Navigation } from "./components/Navigation";
 
 export const metadata: Metadata = {
   title: "Poly Maker Dashboard",
@@ -14,7 +15,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen">
-        <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
+        <div className="mx-auto max-w-6xl px-6 py-10">
+          <Navigation />
+          {children}
+        </div>
       </body>
     </html>
   );

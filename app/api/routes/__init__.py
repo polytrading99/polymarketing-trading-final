@@ -8,6 +8,7 @@ from .positions import router as positions_router
 from .metrics import router as metrics_router
 from .bot import router as bot_router
 from .pnl import router as pnl_router
+from .mm_bot import router as mm_bot_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["system"])
@@ -18,6 +19,7 @@ api_router.include_router(positions_router, prefix="/positions", tags=["position
 api_router.include_router(metrics_router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(bot_router, prefix="/bot", tags=["bot"])
 api_router.include_router(pnl_router, prefix="/pnl", tags=["pnl"])
+api_router.include_router(mm_bot_router, prefix="/mm-bot", tags=["mm-bot"])
 
 __all__ = ["api_router"]
 

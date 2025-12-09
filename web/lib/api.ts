@@ -92,4 +92,91 @@ export async function fetchCurrentPolymarketMarkets(limit: number = 100): Promis
   return res.json();
 }
 
+// MM Bot API
+export type MMBotStatus = {
+  is_running: boolean;
+  main_process?: {
+    pid: number;
+    returncode: number | null;
+    alive: boolean;
+  } | null;
+  trade_process?: {
+    pid: number;
+    returncode: number | null;
+    alive: boolean;
+  } | null;
+};
+
+export type MMBotConfig = {
+  api: {
+    PRIVATE_KEY: string;
+    PROXY_ADDRESS: string | null;
+    SIGNATURE_TYPE: number;
+    CHAIN_ID: number;
+  };
+  strategies: {
+    strategy_1: any;
+    strategy_2: any;
+  };
+  [key: string]: any;
+};
+
+export async function getMMBotStatus(): Promise<MMBotStatus> {
+  const res = await fetch(`${API_BASE}/mm-bot/status`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch MM bot status: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getMMBotConfig(): Promise<MMBotConfig> {
+  const res = await fetch(`${API_BASE}/mm-bot/config`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch MM bot config: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function startMMBot(): Promise<void> {
+  const res = await fetch(`${API_BASE}/mm-bot/start`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Failed to start MM bot" }));
+    throw new Error(error.detail || "Failed to start MM bot");
+  }
+}
+
+export async function stopMMBot(): Promise<void> {
+  const res = await fetch(`${API_BASE}/mm-bot/stop`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Failed to stop MM bot" }));
+    throw new Error(error.detail || "Failed to stop MM bot");
+  }
+}
+
+export async function restartMMBot(): Promise<void> {
+  const res = await fetch(`${API_BASE}/mm-bot/restart`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Failed to restart MM bot" }));
+    throw new Error(error.detail || "Failed to restart MM bot");
+  }
+}
+
+export async function updateMMBotConfig(config: Partial<MMBotConfig>): Promise<void> {
+  const res = await fetch(`${API_BASE}/mm-bot/config`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ config }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Failed to update MM bot config" }));
+    throw new Error(error.detail || "Failed to update MM bot config");
+  }
+}
+
 
