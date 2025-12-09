@@ -157,12 +157,34 @@ async def fetch_current_polymarket_markets(
     def _fetch_markets_sync(limit: int):
         """Synchronous function to fetch markets (runs in thread pool)."""
         try:
-            from data_updater.trading_utils import get_clob_client
-            import pandas as pd
+            from py_clob_client.client import ClobClient
+            import os
             
-            client = get_clob_client()
-            if client is None:
+            # Get credentials from environment
+            private_key = os.getenv("PK")
+            proxy_address = os.getenv("BROWSER_ADDRESS")
+            
+            if not private_key:
                 return []
+            
+            # Initialize CLOB client
+            client_kwargs = {
+                "host": "https://clob.polymarket.com",
+                "key": private_key,
+                "chain_id": 137,
+            }
+            
+            if proxy_address:
+                client_kwargs["funder"] = proxy_address
+            
+            signature_type = os.getenv("SIGNATURE_TYPE", "1")
+            if signature_type:
+                try:
+                    client_kwargs["signature_type"] = int(signature_type)
+                except ValueError:
+                    pass
+            
+            client = ClobClient(**client_kwargs)
             
             cursor = ""
             all_markets = []

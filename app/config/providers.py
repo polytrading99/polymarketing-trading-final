@@ -32,10 +32,7 @@ class GoogleSheetConfigProvider(BaseConfigProvider):
     async def fetch(self) -> BotConfigSnapshot:
         # Read directly from Google Sheets to avoid circular dependency
         def _read_sheets():
-            try:
-                from poly_utils.google_utils import get_spreadsheet
-            except ImportError:
-                from data_updater.google_utils import get_spreadsheet
+            from poly_utils.google_utils import get_spreadsheet
             
             spreadsheet = get_spreadsheet(read_only=True)
             wk_full = spreadsheet.worksheet("Full Markets")
