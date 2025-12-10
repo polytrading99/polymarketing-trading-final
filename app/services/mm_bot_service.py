@@ -86,12 +86,17 @@ def start_bot() -> bool:
             # Open log file for trade.py
             trade_log = open(log_dir / "trade.log", "a")
             
+            # Use python3 explicitly and ensure proper environment
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(BOT_DIR.parent.parent) + ":" + env.get("PYTHONPATH", "")
+            
             _trade_process = subprocess.Popen(
-                ["python", str(TRADE_SCRIPT)],
+                ["python3", str(TRADE_SCRIPT)],
                 cwd=str(BOT_DIR),
                 stdout=trade_log,
                 stderr=subprocess.STDOUT,  # Combine stderr into stdout
-                env=os.environ.copy()
+                env=env,
+                bufsize=1  # Line buffered
             )
             
             # Wait a moment for trade.py to initialize
@@ -108,12 +113,17 @@ def start_bot() -> bool:
             # Open log file for main bot
             main_log = open(log_dir / "mm_main.log", "a")
             
+            # Use python3 explicitly and ensure proper environment
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(BOT_DIR.parent.parent) + ":" + env.get("PYTHONPATH", "")
+            
             _bot_process = subprocess.Popen(
-                ["python", str(MAIN_SCRIPT)],
+                ["python3", str(MAIN_SCRIPT)],
                 cwd=str(BOT_DIR),
                 stdout=main_log,
                 stderr=subprocess.STDOUT,  # Combine stderr into stdout
-                env=os.environ.copy()
+                env=env,
+                bufsize=1  # Line buffered
             )
             
             # Check if process immediately crashed
