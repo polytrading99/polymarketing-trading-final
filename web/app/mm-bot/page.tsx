@@ -251,51 +251,6 @@ export default function MMBotPage() {
           </div>
         ) : (
           <>
-            {/* Current Market Info */}
-            {status.current_market && (
-              <div className="mb-4 p-4 rounded-md border border-blue-500/30 bg-blue-500/10">
-                <div className="text-sm font-semibold text-blue-300 mb-2">Current Market</div>
-                <div className="text-xs space-y-1">
-                  <div className="text-slate-300">
-                    <span className="text-slate-400">Market:</span> {status.current_market.slug || "BTC 15m Up/Down"}
-                  </div>
-                  {status.current_market.market_id && (
-                    <div className="text-slate-300 font-mono text-xs">
-                      <span className="text-slate-400">ID:</span> {status.current_market.market_id.slice(0, 20)}...
-                    </div>
-                  )}
-                  {status.current_market.bucket_ts && (
-                    <div className="text-slate-300">
-                      <span className="text-slate-400">Bucket:</span> {new Date(status.current_market.bucket_ts * 1000).toLocaleString()}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Recent Errors */}
-            {status.recent_errors && status.recent_errors.length > 0 && (
-              <div className="mb-4 p-4 rounded-md border border-red-500/30 bg-red-500/10">
-                <div className="text-sm font-semibold text-red-300 mb-2">Recent Errors</div>
-                <div className="space-y-2">
-                  {status.recent_errors.map((error: any, idx: number) => (
-                    <div key={idx} className="text-xs">
-                      <div className="text-red-400 font-semibold">{error.type}</div>
-                      <div className="text-slate-300">{error.message}</div>
-                      {error.full_error && (
-                        <div className="text-slate-500 mt-1 font-mono text-xs break-all">
-                          {error.full_error.slice(0, 150)}...
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-        
-        {status && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className={clsx(
