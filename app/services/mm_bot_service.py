@@ -244,6 +244,8 @@ def get_bot_status() -> Dict[str, Any]:
             "is_running": _is_running,
             "main_process": None,
             "trade_process": None,
+            "current_market": None,
+            "recent_errors": [],
         }
         
         if _bot_process:
@@ -259,6 +261,85 @@ def get_bot_status() -> Dict[str, Any]:
                 "returncode": _trade_process.returncode,
                 "alive": _trade_process.poll() is None,
             }
+        
+        # Parse log to get current market info
+        try:
+            log_file = BOT_DIR.parent / "logs" / "mm_main.log"
+            if log_file.exists():
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                
+                # Get last 200 lines
+                recent_lines = lines[-200:] if len(lines) > 200 else lines
+                
+                # Find current market info
+                market_info = {}
+                for line in reversed(recent_lines):
+                    if "[MAIN] new bucket:" in line:
+                        # Extract market info
+                        if "bucket_ts=" in line:
+                            try:
+                                parts = line.split("bucket_ts=")
+                                if len(parts) > 1:
+                                    bucket_part = parts[1].split(",")[0].strip()
+                                    market_info["bucket_ts"] = int(bucket_part)
+                                    market_info["slug"] = f"btc-updown-15m-{bucket_part}"
+                            except:
+                                pass
+                        if "market_id=" in line:
+                            try:
+                                parts = line.split("market_id=")
+                                if len(parts) > 1:
+                                    market_id = parts[1].split(",")[0].strip()
+                                    market_info["market_id"] = market_id
+                            except:
+                                pass
+                        if market_info:
+                            break
+                
+                if market_info:
+                    status["current_market"] = market_info
+                
+                # Get recent errors
+                errors = []
+                for line in reversed(recent_lines[-50:]):
+                    if "error_message" in line or "PolyApiException" in line:
+                        error_msg = line.strip()[:200]
+                        if "Size" in error_msg and "lower than the minimum" in error_msg:
+                            # Extract minimum size
+                            try:
+                                if "minimum:" in error_msg:
+                                    min_size = error_msg.split("minimum:")[-1].strip().rstrip("'}]")
+                                    errors.append({
+                                        "type": "Minimum Order Size",
+                                        "message": f"Market requires minimum order size of ${min_size}",
+                                        "full_error": error_msg
+                                    })
+                            except:
+                                errors.append({
+                                    "type": "Order Error",
+                                    "message": error_msg,
+                                    "full_error": error_msg
+                                })
+                        elif "invalid signature" in error_msg.lower():
+                            errors.append({
+                                "type": "Invalid Signature",
+                                "message": "Order signature validation failed",
+                                "full_error": error_msg
+                            })
+                        elif "not enough balance" in error_msg.lower() or "allowance" in error_msg.lower():
+                            errors.append({
+                                "type": "Balance/Allowance",
+                                "message": "Insufficient balance or contract not approved",
+                                "full_error": error_msg
+                            })
+                        if len(errors) >= 3:
+                            break
+                
+                if errors:
+                    status["recent_errors"] = errors
+        except Exception as e:
+            logger.debug(f"Could not parse market info from logs: {e}")
         
         return status
 
