@@ -131,21 +131,22 @@ def check_dependencies():
     """Check if required Python packages are installed."""
     print_section("Python Dependencies")
     
-    required_packages = [
-        "numpy",
-        "websocket-client",
-        "py-clob-client",
-        "web3",
-        "requests",
-    ]
+    # Map package name to import name (they can differ)
+    package_imports = {
+        "numpy": "numpy",
+        "websocket-client": "websocket",  # Package name is websocket-client, import is websocket
+        "py-clob-client": "py_clob_client",
+        "web3": "web3",
+        "requests": "requests",
+    }
     
     all_ok = True
-    for package in required_packages:
+    for package_name, import_name in package_imports.items():
         try:
-            __import__(package.replace("-", "_"))
-            print(f"✓ {package}")
+            __import__(import_name)
+            print(f"✓ {package_name}")
         except ImportError:
-            print(f"✗ {package}: NOT INSTALLED")
+            print(f"✗ {package_name}: NOT INSTALLED (tried to import '{import_name}')")
             all_ok = False
     
     return all_ok

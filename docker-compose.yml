@@ -13,6 +13,9 @@ services:
       LOG_LEVEL: INFO
       VPS_IP: ${VPS_IP:-51.38.126.98}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://51.38.126.98:3000,http://51.38.126.98:3001}
+      PK: ${PK}
+      BROWSER_ADDRESS: ${BROWSER_ADDRESS}
+      SIGNATURE_TYPE: ${SIGNATURE_TYPE:-1}
     depends_on:
       postgres:
         condition: service_healthy
