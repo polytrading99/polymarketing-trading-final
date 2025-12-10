@@ -33,6 +33,12 @@ from typing import Any, Dict, Optional
 # -----------------------------------------------------------------------------
 
 DEFAULT_CONFIG: Dict[str, Any] = {
+    "api": {
+        "PRIVATE_KEY": "",
+        "PROXY_ADDRESS": None,
+        "SIGNATURE_TYPE": 1,
+        "CHAIN_ID": 137,
+    },
     "entry_exit": {
         # Open position only if bid >= ENTRY_BID_THRESHOLD
         "ENTRY_BID_THRESHOLD": 0.6,
