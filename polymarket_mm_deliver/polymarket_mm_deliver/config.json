@@ -53,20 +53,20 @@
           {
             "start_sec": 0,
             "end_sec": 300,
-            "cap_usd": 1.0
+            "cap_usd": 3.0
           },
           {
             "start_sec": 300,
             "end_sec": 600,
-            "cap_usd": 1.5
+            "cap_usd": 4.0
           },
           {
             "start_sec": 600,
             "end_sec": 900,
-            "cap_usd": 2.0
+            "cap_usd": 5.0
           }
         ],
-        "MIN_TRADE_SIZE": 1.0,
+        "MIN_TRADE_SIZE": 5.0,
         "ENABLE_DUST_MERGE": true
       },
 
