@@ -105,9 +105,8 @@ def start_bot() -> bool:
             log_dir = BOT_DIR.parent / "logs"
             log_dir.mkdir(exist_ok=True)
             
-            # Open log files
+            # Open log file for main bot
             main_log = open(log_dir / "mm_main.log", "a")
-            trade_log = open(log_dir / "trade.log", "a")
             
             _bot_process = subprocess.Popen(
                 ["python", str(MAIN_SCRIPT)],
@@ -121,16 +120,25 @@ def start_bot() -> bool:
             import time
             time.sleep(1)
             if _bot_process.poll() is not None:
-                # Process crashed immediately, read the log
-                main_log.flush()
-                main_log.seek(0)
-                error_output = main_log.read()
+                # Process crashed immediately, read the log file
                 main_log.close()
-                trade_log.close()
+                try:
+                    with open(log_dir / "mm_main.log", "r") as f:
+                        # Read last 2000 chars
+                        f.seek(0, 2)  # Seek to end
+                        file_size = f.tell()
+                        f.seek(max(0, file_size - 2000))  # Read last 2000 chars
+                        error_output = f.read()
+                except Exception as e:
+                    error_output = f"Could not read log file: {e}"
+                
                 logger.error(f"Bot process crashed immediately with code {_bot_process.returncode}")
-                logger.error(f"Error output: {error_output[:1000]}")  # First 1000 chars
+                logger.error(f"Error output (last 2000 chars): {error_output}")
                 _bot_process = None
-                _trade_process = None
+                if _trade_process:
+                    _trade_process.terminate()
+                    _trade_process.wait(timeout=5)
+                    _trade_process = None
                 _is_running = False
                 return False
             
