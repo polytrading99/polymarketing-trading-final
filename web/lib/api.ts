@@ -105,6 +105,16 @@ export type MMBotStatus = {
     returncode: number | null;
     alive: boolean;
   } | null;
+  current_market?: {
+    slug?: string;
+    market_id?: string;
+    bucket_ts?: number;
+  } | null;
+  recent_errors?: Array<{
+    type: string;
+    message: string;
+    full_error?: string;
+  }>;
 };
 
 export type MMBotConfig = {
