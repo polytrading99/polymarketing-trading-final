@@ -204,27 +204,44 @@ class PolymarketClient:
                 asset_id,
                 limit,
             )
-            # Adjust parameter names to match your local py_clob_client version.
-            return client.get_open_orders(
-                market=market_id,
-                asset_id=asset_id,
-                limit=limit,
-            )
+            try:
+                # Adjust parameter names to match your local py_clob_client version.
+                return client.get_open_orders(
+                    market=market_id,
+                    asset_id=asset_id,
+                    limit=limit,
+                )
+            except Exception as e:
+                logger.warning(f"client.get_open_orders failed: {e}, falling back to data-api")
 
+        # Try get_orders without status parameter (some versions don't support it)
         if hasattr(client, "get_orders"):
             logger.debug(
-                "Fetching open orders via client.get_orders status=open market_id=%s asset_id=%s limit=%s",
+                "Fetching open orders via client.get_orders (no status param) market_id=%s asset_id=%s limit=%s",
                 market_id,
                 asset_id,
                 limit,
             )
-            # Adjust parameter names according to your local implementation.
-            return client.get_orders(
-                status="open",
-                market=market_id,
-                asset_id=asset_id,
-                limit=limit,
-            )
+            try:
+                # Try without status parameter first
+                result = client.get_orders(
+                    market=market_id,
+                    asset_id=asset_id,
+                    limit=limit,
+                )
+                # Filter to open orders if result is a list
+                if isinstance(result, list):
+                    return [o for o in result if o.get("status", "").upper() in ("OPEN", "LIVE", "PART_FILLED")]
+                elif isinstance(result, dict):
+                    orders = result.get("orders") or result.get("data") or []
+                    if isinstance(orders, list):
+                        return {"orders": [o for o in orders if o.get("status", "").upper() in ("OPEN", "LIVE", "PART_FILLED")]}
+                return result
+            except TypeError:
+                # If get_orders doesn't accept these parameters, fall through to data-api
+                logger.debug("client.get_orders doesn't accept these parameters, using data-api")
+            except Exception as e:
+                logger.warning(f"client.get_orders failed: {e}, falling back to data-api")
 
         # Fall back to data-api /orders.
         params: Dict[str, object] = {
