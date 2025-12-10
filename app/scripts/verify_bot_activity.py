@@ -16,46 +16,54 @@ def check_processes():
     print("  PROCESS CHECK")
     print("="*70)
     
+    # Try to use bot service status first
     try:
-        # Check for Python processes
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True
-        )
+        from app.services.mm_bot_service import get_bot_status
+        status = get_bot_status()
         
-        lines = result.stdout.split('\n')
-        main_processes = [l for l in lines if 'main_final.py' in l and 'python' in l]
-        trade_processes = [l for l in lines if 'trade.py' in l and 'python' in l]
+        print(f"\nBot Service Status:")
+        print(f"  is_running: {status.get('is_running', False)}")
         
-        print(f"\nMain Process (main_final.py):")
-        if main_processes:
-            for proc in main_processes:
-                # Extract PID and runtime
-                parts = proc.split()
-                if len(parts) >= 10:
-                    pid = parts[1]
-                    runtime = parts[9]  # CPU time
-                    print(f"  ✓ Running - PID: {pid}, Runtime: {runtime}")
+        main_proc = status.get('main_process')
+        if main_proc:
+            pid = main_proc.get('pid')
+            alive = main_proc.get('alive', False)
+            returncode = main_proc.get('returncode')
+            print(f"\nMain Process:")
+            if alive:
+                print(f"  ✓ Running - PID: {pid}")
+            elif returncode is not None:
+                print(f"  ✗ Crashed - PID: {pid}, Exit code: {returncode}")
+            else:
+                print(f"  ⚠ Unknown status - PID: {pid}")
         else:
-            print("  ✗ NOT RUNNING")
+            print(f"\nMain Process: ✗ NOT RUNNING")
         
-        print(f"\nTrade Process (trade.py):")
-        if trade_processes:
-            for proc in trade_processes:
-                parts = proc.split()
-                if len(parts) >= 10:
-                    pid = parts[1]
-                    runtime = parts[9]
-                    print(f"  ✓ Running - PID: {pid}, Runtime: {runtime}")
+        trade_proc = status.get('trade_process')
+        if trade_proc:
+            pid = trade_proc.get('pid')
+            alive = trade_proc.get('alive', False)
+            returncode = trade_proc.get('returncode')
+            print(f"\nTrade Process:")
+            if alive:
+                print(f"  ✓ Running - PID: {pid}")
+            elif returncode is not None:
+                print(f"  ✗ Crashed - PID: {pid}, Exit code: {returncode}")
+            else:
+                print(f"  ⚠ Unknown status - PID: {pid}")
         else:
-            print("  ✗ NOT RUNNING")
+            print(f"\nTrade Process: ✗ NOT RUNNING")
         
-        return len(main_processes) > 0 and len(trade_processes) > 0
+        main_alive = main_proc and main_proc.get('alive', False) if main_proc else False
+        trade_alive = trade_proc and trade_proc.get('alive', False) if trade_proc else False
+        
+        return main_alive and trade_alive
         
     except Exception as e:
-        print(f"  ✗ Error checking processes: {e}")
-        return False
+        print(f"  ⚠ Could not check via service: {e}")
+        # Fallback: check if logs are being written (indicates process is running)
+        print("  (Will infer from log activity)")
+        return None  # Unknown, will be determined by log activity
 
 def check_log_files():
     """Check if log files exist and have recent activity."""
