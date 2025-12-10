@@ -120,7 +120,7 @@ export default function MMBotPage() {
               <div className="text-sm text-slate-400 mb-1">USDC Balance</div>
               {accountSummary.balance?.success ? (
                 <div className="text-2xl font-semibold text-emerald-400">
-                  ${(accountSummary.balance.balance?.usdc || 0).toFixed(2)}
+                  ${(Number(accountSummary.balance.balance?.usdc) || 0).toFixed(2)}
                 </div>
               ) : (
                 <div className="text-sm text-red-400">
@@ -138,7 +138,7 @@ export default function MMBotPage() {
                     {accountSummary.positions.total_positions || 0}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    Total Value: ${(accountSummary.positions.total_value_usd || 0).toFixed(2)}
+                    Total Value: ${(Number(accountSummary.positions.total_value_usd) || 0).toFixed(2)}
                   </div>
                 </div>
               ) : (
@@ -177,8 +177,8 @@ export default function MMBotPage() {
               <div className="text-sm font-semibold text-slate-300 mb-2">Recent Positions</div>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {accountSummary.positions.positions.slice(0, 5).map((pos, idx) => {
-                  const size = pos.size || 0;
-                  const avgPrice = pos.avgPrice || pos.avg_price || 0;
+                  const size = Number(pos.size) || 0;
+                  const avgPrice = Number(pos.avgPrice || pos.avg_price) || 0;
                   const value = size * avgPrice;
                   return (
                     <div key={idx} className="text-xs bg-slate-900/40 p-2 rounded">
@@ -208,8 +208,8 @@ export default function MMBotPage() {
                 {accountSummary.orders.orders.slice(0, 5).map((order, idx) => {
                   const orderId = order.id || order.order_id || order.orderId || "Unknown";
                   const side = order.side || "UNKNOWN";
-                  const price = order.price || 0;
-                  const size = order.size || order.remainingSize || 0;
+                  const price = Number(order.price) || 0;
+                  const size = Number(order.size || order.remainingSize) || 0;
                   return (
                     <div key={idx} className="text-xs bg-slate-900/40 p-2 rounded">
                       <div className="flex justify-between">
