@@ -45,22 +45,46 @@ def update_config_from_env() -> None:
     """Update config.json with environment variables if they exist."""
     config = load_config()
     
-    # Update API credentials from environment
-    if "PK" in os.environ:
-        config["api"]["PRIVATE_KEY"] = os.environ["PK"]
+    # Ensure api section exists
+    if "api" not in config:
+        config["api"] = {}
     
-    if "BROWSER_ADDRESS" in os.environ:
-        proxy = os.environ["BROWSER_ADDRESS"]
-        config["api"]["PROXY_ADDRESS"] = proxy if proxy and proxy.lower() != "null" else None
+    # Update API credentials from environment (environment takes precedence)
+    if "PK" in os.environ and os.environ["PK"]:
+        pk = os.environ["PK"].strip()
+        if pk and pk.upper() not in ("API", "NOT SET", "NONE", ""):
+            config["api"]["PRIVATE_KEY"] = pk
+            logger.info("Updated PRIVATE_KEY from environment")
+        else:
+            logger.warning("PK environment variable is set but appears to be a placeholder")
+    
+    if "BROWSER_ADDRESS" in os.environ and os.environ["BROWSER_ADDRESS"]:
+        proxy = os.environ["BROWSER_ADDRESS"].strip()
+        if proxy and proxy.upper() not in ("WALLET API", "NOT SET", "NONE", "NULL", ""):
+            config["api"]["PROXY_ADDRESS"] = proxy
+            logger.info("Updated PROXY_ADDRESS from environment")
+        else:
+            logger.warning("BROWSER_ADDRESS environment variable is set but appears to be a placeholder")
     
     # Update signature type if provided
     if "SIGNATURE_TYPE" in os.environ:
         try:
-            config["api"]["SIGNATURE_TYPE"] = int(os.environ["SIGNATURE_TYPE"])
+            sig_type = int(os.environ["SIGNATURE_TYPE"])
+            config["api"]["SIGNATURE_TYPE"] = sig_type
+            logger.info(f"Updated SIGNATURE_TYPE from environment: {sig_type}")
         except ValueError:
             logger.warning(f"Invalid SIGNATURE_TYPE: {os.environ['SIGNATURE_TYPE']}")
     
+    # Validate config before saving
+    api_cfg = config["api"]
+    if not api_cfg.get("PRIVATE_KEY") or api_cfg.get("PRIVATE_KEY", "").upper() in ("API", "NOT SET", "NONE", ""):
+        raise ValueError("PRIVATE_KEY is not set or is a placeholder. Set PK environment variable.")
+    
+    if not api_cfg.get("PROXY_ADDRESS") or api_cfg.get("PROXY_ADDRESS", "").upper() in ("WALLET API", "NOT SET", "NONE", "NULL", ""):
+        raise ValueError("PROXY_ADDRESS is not set or is a placeholder. Set BROWSER_ADDRESS environment variable.")
+    
     save_config(config)
+    logger.info("Config updated successfully from environment variables")
 
 
 def start_bot() -> bool:
