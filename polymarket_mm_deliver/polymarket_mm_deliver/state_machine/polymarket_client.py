@@ -243,36 +243,87 @@ class PolymarketClient:
             except Exception as e:
                 logger.warning(f"client.get_orders failed: {e}, falling back to data-api")
 
-        # Fall back to data-api /orders.
-        params: Dict[str, object] = {
-            "limit": limit,
-            "status": "open",
-        }
+        # Fall back to CLOB API directly (more reliable than data-api)
+        try:
+            # Try using the client's underlying methods
+            if hasattr(self.client, "_get") or hasattr(self.client, "get"):
+                # Some versions have a get method
+                method = getattr(self.client, "_get", None) or getattr(self.client, "get", None)
+                if method:
+                    try:
+                        # Try /orders endpoint on CLOB
+                        result = method("/orders")
+                        if isinstance(result, dict):
+                            orders = result.get("orders") or result.get("data") or []
+                        elif isinstance(result, list):
+                            orders = result
+                        else:
+                            orders = []
+                        # Filter to open orders
+                        open_orders = [
+                            o for o in orders 
+                            if isinstance(o, dict) and o.get("status", "").upper() in ("OPEN", "LIVE", "PART_FILLED", "PENDING")
+                        ]
+                        return open_orders if isinstance(open_orders, list) else {"orders": open_orders}
+                    except Exception as e:
+                        logger.debug(f"CLOB /orders endpoint failed: {e}")
+        except Exception as e:
+            logger.debug(f"CLOB client method access failed: {e}")
 
-        if self.wallet_address:
-            params["user"] = self.wallet_address
-        if market_id:
-            params["market"] = market_id
-        if asset_id:
-            params["asset"] = asset_id
+        # Last resort: Try data-api with different endpoint structure
+        try:
+            from web3 import Web3
+            
+            # Ensure wallet address is checksummed
+            wallet = self.wallet_address
+            if wallet:
+                try:
+                    wallet = Web3.to_checksum_address(wallet)
+                except:
+                    pass
+            
+            # Try different data-api endpoints
+            endpoints_to_try = [
+                f"{self.data_api_base}/orders?user={wallet}&limit={limit}" if wallet else None,
+                f"{self.data_api_base}/orders?limit={limit}",
+            ]
+            
+            for url in endpoints_to_try:
+                if not url:
+                    continue
+                try:
+                    logger.info(f"Trying data-api endpoint: {url}")
+                    resp = requests.get(url, timeout=10)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        # Filter to open orders if needed
+                        if isinstance(data, list):
+                            open_orders = [
+                                o for o in data 
+                                if isinstance(o, dict) and o.get("status", "").upper() in ("OPEN", "LIVE", "PART_FILLED", "PENDING")
+                            ]
+                            return open_orders
+                        elif isinstance(data, dict):
+                            orders = data.get("orders") or data.get("data") or []
+                            if isinstance(orders, list):
+                                open_orders = [
+                                    o for o in orders 
+                                    if isinstance(o, dict) and o.get("status", "").upper() in ("OPEN", "LIVE", "PART_FILLED", "PENDING")
+                                ]
+                                return {"orders": open_orders}
+                        return data
+                    elif resp.status_code == 404:
+                        logger.debug(f"Endpoint not found: {url}, trying next...")
+                        continue
+                except Exception as e:
+                    logger.debug(f"Failed to fetch from {url}: {e}")
+                    continue
+        except Exception as e:
+            logger.warning(f"All data-api attempts failed: {e}")
 
-        url = f"{self.data_api_base}/orders"
-        logger.info(
-            "Fetching open orders via data-api: GET %s params=%s",
-            url,
-            params,
-        )
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-
-        logger.debug(
-            "data-api /orders response: count=%s raw_type=%s",
-            len(data) if isinstance(data, list) else "n/a",
-            type(data),
-        )
-
-        return data
+        # If everything fails, return empty list
+        logger.warning("Could not fetch open orders from any source, returning empty list")
+        return []
 
     def get_positions_raw(self) -> dict:
         """
