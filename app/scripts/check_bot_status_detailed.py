@@ -29,6 +29,8 @@ print()
 # 1. Check if processes are running
 print("1. CHECKING PROCESS STATUS")
 print("-" * 70)
+main_process = []
+trade_process = []
 try:
     result = subprocess.run(
         ["ps", "aux"],
@@ -57,7 +59,17 @@ try:
         print("   Run: curl -X POST http://localhost:8000/mm-bot/start")
         print()
 except Exception as e:
-    print(f"✗ Error checking processes: {e}")
+    print(f"⚠️  Cannot check processes directly: {e}")
+    print("   (This is normal in Docker - checking via log files instead)")
+    # Try alternative method - check if log files are being updated
+    if main_log.exists():
+        mtime = datetime.fromtimestamp(main_log.stat().st_mtime)
+        age = datetime.now() - mtime
+        if age.seconds < 60:
+            print("   ✓ Bot appears to be running (log updated recently)")
+            main_process = ["running"]  # Mark as running
+        else:
+            print("   ✗ Bot may not be running (log not updated recently)")
 
 print()
 
@@ -242,12 +254,31 @@ if main_log.exists():
         errors = []
         for line in recent_lines:
             if any(keyword in line.lower() for keyword in ["error", "exception", "traceback", "failed", "warn"]):
+                # Get full error message (may span multiple lines)
+                full_error = line.strip()
+                if "PolyApiException" in line:
+                    # Try to get the full error message
+                    if "error_message" in line:
+                        # Extract the error message part
+                        try:
+                            # Look for the error message in the line
+                            if "error':" in line or '"error":' in line:
+                                # Get more context
+                                idx = line.find("error_message")
+                                if idx > 0:
+                                    # Get up to 200 chars from error_message
+                                    full_error = line[idx:idx+200]
+                        except:
+                            pass
+                
                 if "invalid signature" in line.lower():
-                    errors.append(("Invalid Signature", line.strip()[:150]))
+                    errors.append(("Invalid Signature", full_error[:200]))
                 elif "not enough balance" in line.lower() or "allowance" in line.lower():
-                    errors.append(("Balance/Allowance", line.strip()[:150]))
-                elif "exception" in line.lower():
-                    errors.append(("Exception", line.strip()[:150]))
+                    errors.append(("Balance/Allowance", full_error[:200]))
+                elif "order" in line.lower() and "invalid" in line.lower():
+                    errors.append(("Order Invalid", full_error[:200]))
+                elif "exception" in line.lower() or "PolyApiException" in line:
+                    errors.append(("API Exception", full_error[:200]))
         
         if errors:
             print(f"Found {len(errors)} recent errors:")
