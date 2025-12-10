@@ -1,0 +1,214 @@
+"""
+Service to get account balance and positions from Polymarket.
+"""
+import os
+import logging
+from typing import Dict, Any, List, Optional
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Path to the bot directory
+BOT_DIR = Path(__file__).parent.parent.parent / "polymarket_mm_deliver" / "polymarket_mm_deliver"
+CONFIG_FILE = BOT_DIR / "config.json"
+
+def get_polymarket_client():
+    """Create a PolymarketClient instance from config."""
+    import json
+    import sys
+    
+    # Add bot directory to path
+    sys.path.insert(0, str(BOT_DIR))
+    
+    # Load config
+    with open(CONFIG_FILE, 'r') as f:
+        config = json.load(f)
+    
+    api_cfg = config.get("api", {})
+    
+    # Get values from environment or config
+    private_key = os.environ.get("PK") or api_cfg.get("PRIVATE_KEY")
+    proxy_address = os.environ.get("BROWSER_ADDRESS") or api_cfg.get("PROXY_ADDRESS")
+    signature_type = os.environ.get("SIGNATURE_TYPE") or api_cfg.get("SIGNATURE_TYPE", 1)
+    chain_id = api_cfg.get("CHAIN_ID", 137)
+    
+    # Ensure signature_type is int
+    try:
+        signature_type = int(signature_type)
+    except (ValueError, TypeError):
+        signature_type = 1
+    
+    from state_machine.polymarket_client import PolymarketClient
+    from strategy.time_bucket_mm import CLOB_HOST
+    
+    client = PolymarketClient(
+        host=CLOB_HOST,
+        private_key=private_key,
+        chain_id=chain_id,
+        signature_type=signature_type,
+        funder=proxy_address,
+    )
+    
+    return client
+
+def get_account_balance() -> Dict[str, Any]:
+    """Get USDC balance for the account."""
+    try:
+        from web3 import Web3
+        
+        # Polygon RPC endpoint
+        polygon_rpc = "https://polygon-rpc.com"
+        w3 = Web3(Web3.HTTPProvider(polygon_rpc))
+        
+        # USDC token contract on Polygon
+        USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+        
+        # Get wallet address
+        client = get_polymarket_client()
+        wallet_address = client.wallet_address
+        
+        if not wallet_address:
+            return {
+                "success": False,
+                "error": "Wallet address not configured",
+            }
+        
+        # ERC20 ABI for balanceOf
+        erc20_abi = [
+            {
+                "constant": True,
+                "inputs": [{"name": "_owner", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "balance", "type": "uint256"}],
+                "type": "function"
+            },
+            {
+                "constant": True,
+                "inputs": [],
+                "name": "decimals",
+                "outputs": [{"name": "", "type": "uint8"}],
+                "type": "function"
+            }
+        ]
+        
+        # Get USDC contract
+        usdc_contract = w3.eth.contract(
+            address=Web3.to_checksum_address(USDC_ADDRESS),
+            abi=erc20_abi
+        )
+        
+        # Get balance
+        balance_wei = usdc_contract.functions.balanceOf(
+            Web3.to_checksum_address(wallet_address)
+        ).call()
+        
+        # Get decimals (USDC has 6 decimals)
+        try:
+            decimals = usdc_contract.functions.decimals().call()
+        except:
+            decimals = 6  # USDC default
+        
+        # Convert to human readable
+        balance_usdc = balance_wei / (10 ** decimals)
+        
+        return {
+            "success": True,
+            "balance": {
+                "usdc": round(balance_usdc, 2),
+                "currency": "USDC",
+            },
+            "wallet_address": wallet_address,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get account balance: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+def get_account_positions() -> Dict[str, Any]:
+    """Get all positions for the account."""
+    try:
+        client = get_polymarket_client()
+        
+        # Get all positions
+        positions = client.get_positions(
+            user=None,  # Use wallet_address from client
+            market_id=None,
+            size_threshold=0.0,
+            limit=100,
+        )
+        
+        # Calculate total value
+        total_value = 0.0
+        position_count = 0
+        
+        for pos in positions:
+            try:
+                size = float(pos.get("size", 0.0) or 0.0)
+                avg_price = pos.get("avgPrice") or pos.get("avg_price")
+                if avg_price is not None:
+                    avg_price = float(avg_price)
+                    total_value += size * avg_price
+                if size > 0:
+                    position_count += 1
+            except (ValueError, TypeError):
+                continue
+        
+        return {
+            "success": True,
+            "positions": positions,
+            "total_positions": position_count,
+            "total_value_usd": round(total_value, 2),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get account positions: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "positions": [],
+            "total_positions": 0,
+            "total_value_usd": 0.0,
+        }
+
+def get_open_orders() -> Dict[str, Any]:
+    """Get all open orders for the account."""
+    try:
+        client = get_polymarket_client()
+        
+        # Get open orders
+        orders = client.get_open_orders_raw(limit=100)
+        
+        # Parse orders list
+        if isinstance(orders, dict):
+            orders_list = orders.get("orders") or orders.get("data") or []
+        else:
+            orders_list = orders if isinstance(orders, list) else []
+        
+        return {
+            "success": True,
+            "orders": orders_list,
+            "total_orders": len(orders_list),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get open orders: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "orders": [],
+            "total_orders": 0,
+        }
+
+def get_account_summary() -> Dict[str, Any]:
+    """Get complete account summary: balance, positions, and orders."""
+    balance = get_account_balance()
+    positions = get_account_positions()
+    orders = get_open_orders()
+    
+    return {
+        "balance": balance,
+        "positions": positions,
+        "orders": orders,
+        "wallet_address": os.environ.get("BROWSER_ADDRESS") or "Unknown",
+    }
+

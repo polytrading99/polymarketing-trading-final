@@ -179,4 +179,93 @@ export async function updateMMBotConfig(config: Partial<MMBotConfig>): Promise<v
   }
 }
 
+// Account API
+export type AccountBalance = {
+  success: boolean;
+  balance?: {
+    usdc: number;
+    currency: string;
+  };
+  error?: string;
+  note?: string;
+};
+
+export type AccountPosition = {
+  asset?: string;
+  asset_id?: string;
+  size?: number;
+  avgPrice?: number;
+  avg_price?: number;
+  title?: string;
+  market?: string;
+  [key: string]: any;
+};
+
+export type AccountPositions = {
+  success: boolean;
+  positions: AccountPosition[];
+  total_positions: number;
+  total_value_usd: number;
+  error?: string;
+};
+
+export type OpenOrder = {
+  id?: string;
+  order_id?: string;
+  orderId?: string;
+  market?: string;
+  asset?: string;
+  side?: string;
+  price?: number;
+  size?: number;
+  remainingSize?: number;
+  [key: string]: any;
+};
+
+export type AccountOrders = {
+  success: boolean;
+  orders: OpenOrder[];
+  total_orders: number;
+  error?: string;
+};
+
+export type AccountSummary = {
+  balance: AccountBalance;
+  positions: AccountPositions;
+  orders: AccountOrders;
+  wallet_address: string;
+};
+
+export async function getAccountBalance(): Promise<AccountBalance> {
+  const res = await fetch(`${API_BASE}/mm-bot/account/balance`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch account balance: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getAccountPositions(): Promise<AccountPositions> {
+  const res = await fetch(`${API_BASE}/mm-bot/account/positions`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch account positions: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getAccountOrders(): Promise<AccountOrders> {
+  const res = await fetch(`${API_BASE}/mm-bot/account/orders`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch account orders: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getAccountSummary(): Promise<AccountSummary> {
+  const res = await fetch(`${API_BASE}/mm-bot/account/summary`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch account summary: ${res.status}`);
+  }
+  return res.json();
+}
+
 

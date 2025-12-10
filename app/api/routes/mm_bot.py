@@ -13,6 +13,12 @@ from app.services.mm_bot_service import (
     update_config,
     restart_bot,
 )
+from app.services.account_service import (
+    get_account_balance,
+    get_account_positions,
+    get_open_orders,
+    get_account_summary,
+)
 
 router = APIRouter()
 
@@ -81,4 +87,28 @@ async def update_mm_bot_config(update: ConfigUpdate) -> Dict[str, Any]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to update config: {str(e)}"
         )
+
+
+@router.get("/account/balance", summary="Get account balance")
+async def get_account_balance_endpoint() -> Dict[str, Any]:
+    """Get USDC balance for the trading account."""
+    return get_account_balance()
+
+
+@router.get("/account/positions", summary="Get account positions")
+async def get_account_positions_endpoint() -> Dict[str, Any]:
+    """Get all positions for the trading account."""
+    return get_account_positions()
+
+
+@router.get("/account/orders", summary="Get open orders")
+async def get_open_orders_endpoint() -> Dict[str, Any]:
+    """Get all open orders for the trading account."""
+    return get_open_orders()
+
+
+@router.get("/account/summary", summary="Get account summary")
+async def get_account_summary_endpoint() -> Dict[str, Any]:
+    """Get complete account summary: balance, positions, and orders."""
+    return get_account_summary()
 
