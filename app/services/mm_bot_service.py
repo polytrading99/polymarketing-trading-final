@@ -97,8 +97,13 @@ def start_bot() -> bool:
             return False
         
         try:
-            # Update config from environment
-            update_config_from_env()
+            # Update config from environment (this validates and saves config)
+            try:
+                update_config_from_env()
+            except ValueError as e:
+                logger.error(f"Config validation failed: {e}")
+                logger.error("Cannot start bot with invalid config. Please set PK and BROWSER_ADDRESS environment variables.")
+                return False
             
             # Start trade.py (data feed) first
             logger.info("Starting trade.py (data feed)...")
