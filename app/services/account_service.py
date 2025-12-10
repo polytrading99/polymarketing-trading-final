@@ -17,39 +17,56 @@ def get_polymarket_client():
     import json
     import sys
     
-    # Add bot directory to path
-    sys.path.insert(0, str(BOT_DIR))
-    
-    # Load config
-    with open(CONFIG_FILE, 'r') as f:
-        config = json.load(f)
-    
-    api_cfg = config.get("api", {})
-    
-    # Get values from environment or config
-    private_key = os.environ.get("PK") or api_cfg.get("PRIVATE_KEY")
-    proxy_address = os.environ.get("BROWSER_ADDRESS") or api_cfg.get("PROXY_ADDRESS")
-    signature_type = os.environ.get("SIGNATURE_TYPE") or api_cfg.get("SIGNATURE_TYPE", 1)
-    chain_id = api_cfg.get("CHAIN_ID", 137)
-    
-    # Ensure signature_type is int
     try:
-        signature_type = int(signature_type)
-    except (ValueError, TypeError):
-        signature_type = 1
-    
-    from state_machine.polymarket_client import PolymarketClient
-    from strategy.time_bucket_mm import CLOB_HOST
-    
-    client = PolymarketClient(
-        host=CLOB_HOST,
-        private_key=private_key,
-        chain_id=chain_id,
-        signature_type=signature_type,
-        funder=proxy_address,
-    )
-    
-    return client
+        # Add bot directory to path
+        if str(BOT_DIR) not in sys.path:
+            sys.path.insert(0, str(BOT_DIR))
+        
+        # Load config
+        if not CONFIG_FILE.exists():
+            raise FileNotFoundError(f"Config file not found: {CONFIG_FILE}")
+        
+        with open(CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+        
+        if "api" not in config:
+            raise ValueError("Config file missing 'api' section")
+        
+        api_cfg = config.get("api", {})
+        
+        # Get values from environment or config
+        private_key = os.environ.get("PK") or api_cfg.get("PRIVATE_KEY")
+        proxy_address = os.environ.get("BROWSER_ADDRESS") or api_cfg.get("PROXY_ADDRESS")
+        signature_type = os.environ.get("SIGNATURE_TYPE") or api_cfg.get("SIGNATURE_TYPE", 1)
+        chain_id = api_cfg.get("CHAIN_ID", 137)
+        
+        if not private_key or private_key == "API":
+            raise ValueError("PRIVATE_KEY not set or is placeholder")
+        
+        if not proxy_address or proxy_address in ["WALLET API", "null", "None"]:
+            raise ValueError("PROXY_ADDRESS not set or is placeholder")
+        
+        # Ensure signature_type is int
+        try:
+            signature_type = int(signature_type)
+        except (ValueError, TypeError):
+            signature_type = 1
+        
+        from state_machine.polymarket_client import PolymarketClient
+        from strategy.time_bucket_mm import CLOB_HOST
+        
+        client = PolymarketClient(
+            host=CLOB_HOST,
+            private_key=private_key,
+            chain_id=chain_id,
+            signature_type=signature_type,
+            funder=proxy_address,
+        )
+        
+        return client
+    except Exception as e:
+        logger.error(f"Failed to create PolymarketClient: {e}", exc_info=True)
+        raise
 
 def get_account_balance() -> Dict[str, Any]:
     """Get USDC balance for the account."""
@@ -201,14 +218,34 @@ def get_open_orders() -> Dict[str, Any]:
 
 def get_account_summary() -> Dict[str, Any]:
     """Get complete account summary: balance, positions, and orders."""
-    balance = get_account_balance()
-    positions = get_account_positions()
-    orders = get_open_orders()
-    
-    return {
-        "balance": balance,
-        "positions": positions,
-        "orders": orders,
-        "wallet_address": os.environ.get("BROWSER_ADDRESS") or "Unknown",
-    }
+    try:
+        balance = get_account_balance()
+        positions = get_account_positions()
+        orders = get_open_orders()
+        
+        wallet_address = os.environ.get("BROWSER_ADDRESS")
+        if not wallet_address:
+            # Try to get from config
+            try:
+                import json
+                with open(CONFIG_FILE, 'r') as f:
+                    config = json.load(f)
+                wallet_address = config.get("api", {}).get("PROXY_ADDRESS")
+            except:
+                pass
+        
+        return {
+            "balance": balance,
+            "positions": positions,
+            "orders": orders,
+            "wallet_address": wallet_address or "Unknown",
+        }
+    except Exception as e:
+        logger.error(f"Failed to get account summary: {e}", exc_info=True)
+        return {
+            "balance": {"success": False, "error": str(e)},
+            "positions": {"success": False, "error": str(e), "positions": [], "total_positions": 0, "total_value_usd": 0.0},
+            "orders": {"success": False, "error": str(e), "orders": [], "total_orders": 0},
+            "wallet_address": os.environ.get("BROWSER_ADDRESS") or "Unknown",
+        }
 

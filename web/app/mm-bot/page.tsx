@@ -118,13 +118,13 @@ export default function MMBotPage() {
             {/* Balance */}
             <div className="rounded-md border border-slate-800 bg-slate-900/40 p-4">
               <div className="text-sm text-slate-400 mb-1">USDC Balance</div>
-              {accountSummary.balance.success ? (
+              {accountSummary.balance?.success ? (
                 <div className="text-2xl font-semibold text-emerald-400">
-                  ${accountSummary.balance.balance?.usdc?.toFixed(2) || "0.00"}
+                  ${(accountSummary.balance.balance?.usdc || 0).toFixed(2)}
                 </div>
               ) : (
-                <div className="text-sm text-slate-500">
-                  {accountSummary.balance.error || "Unable to fetch"}
+                <div className="text-sm text-red-400">
+                  {accountSummary.balance?.error || "Unable to fetch"}
                 </div>
               )}
             </div>
@@ -132,18 +132,18 @@ export default function MMBotPage() {
             {/* Positions */}
             <div className="rounded-md border border-slate-800 bg-slate-900/40 p-4">
               <div className="text-sm text-slate-400 mb-1">Active Positions</div>
-              {accountSummary.positions.success ? (
+              {accountSummary.positions?.success ? (
                 <div>
                   <div className="text-2xl font-semibold text-blue-400">
-                    {accountSummary.positions.total_positions}
+                    {accountSummary.positions.total_positions || 0}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    Total Value: ${accountSummary.positions.total_value_usd.toFixed(2)}
+                    Total Value: ${(accountSummary.positions.total_value_usd || 0).toFixed(2)}
                   </div>
                 </div>
               ) : (
-                <div className="text-sm text-slate-500">
-                  {accountSummary.positions.error || "Unable to fetch"}
+                <div className="text-sm text-red-400">
+                  {accountSummary.positions?.error || "Unable to fetch"}
                 </div>
               )}
             </div>
@@ -151,13 +151,13 @@ export default function MMBotPage() {
             {/* Open Orders */}
             <div className="rounded-md border border-slate-800 bg-slate-900/40 p-4">
               <div className="text-sm text-slate-400 mb-1">Open Orders</div>
-              {accountSummary.orders.success ? (
+              {accountSummary.orders?.success ? (
                 <div className="text-2xl font-semibold text-yellow-400">
-                  {accountSummary.orders.total_orders}
+                  {accountSummary.orders.total_orders || 0}
                 </div>
               ) : (
-                <div className="text-sm text-slate-500">
-                  {accountSummary.orders.error || "Unable to fetch"}
+                <div className="text-sm text-red-400">
+                  {accountSummary.orders?.error || "Unable to fetch"}
                 </div>
               )}
             </div>
@@ -172,7 +172,7 @@ export default function MMBotPage() {
           </div>
 
           {/* Recent Positions */}
-          {accountSummary.positions.success && accountSummary.positions.positions.length > 0 && (
+          {accountSummary.positions?.success && accountSummary.positions.positions?.length > 0 && (
             <div className="mt-4 pt-4 border-t border-slate-800">
               <div className="text-sm font-semibold text-slate-300 mb-2">Recent Positions</div>
               <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -201,7 +201,7 @@ export default function MMBotPage() {
           )}
 
           {/* Recent Orders */}
-          {accountSummary.orders.success && accountSummary.orders.orders.length > 0 && (
+          {accountSummary.orders?.success && accountSummary.orders.orders?.length > 0 && (
             <div className="mt-4 pt-4 border-t border-slate-800">
               <div className="text-sm font-semibold text-slate-300 mb-2">Recent Orders</div>
               <div className="space-y-2 max-h-40 overflow-y-auto">
