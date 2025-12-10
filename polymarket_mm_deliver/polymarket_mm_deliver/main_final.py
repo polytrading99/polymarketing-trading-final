@@ -6,7 +6,7 @@ import math
 import logging
 import threading
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Optional
 
 from data_reader.load_config import load_config
 from strategy.time_bucket_mm import resolve_market_for_bucket, CLOB_HOST
@@ -88,7 +88,7 @@ def compute_leg_inventory_usd_from_orders(
     acct: AccountState,
     market_id: str,
     outcome: str,
-    mark_price: float | None,
+    mark_price: Optional[float],
 ) -> float:
     """
     Compute leg-level inventory in USD using the same logic as our production exposure calculation.
@@ -189,8 +189,8 @@ def debug_print_leg_inventory(
     tag: str,
     acct: AccountState,
     market_id: str,
-    yes_bid: float | None,
-    no_bid: float | None,
+    yes_bid: Optional[float],
+    no_bid: Optional[float],
 ):
     """
     Debug: print inventory for Up / Down legs.
@@ -252,7 +252,7 @@ def get_strategy_exposure_usd(acct: AccountState, strategy_tag: str) -> float:
 def reprice_entry_if_drifted(
     so: SuperOrder,
     now_ts: float,
-    best_ask: float | None,
+    best_ask: Optional[float],
     token_id: str,
     client: PolymarketClient,
     entry_requote_wait_sec: float,
@@ -461,7 +461,7 @@ def try_exit_once(
 def reprice_exit_if_drifted(
     so: SuperOrder,
     now_ts: float,
-    best_bid: float | None,
+    best_bid: Optional[float],
     token_id: str,
     client: PolymarketClient,
     exit_retry_delay_sec: float,
@@ -606,7 +606,7 @@ def trigger_strategy_stop_loss(
     price_drift_threshold: float,
     sl_order_price: float,
     exit_value_book: Dict[str, float],
-    best_bid: float | None,
+    best_bid: Optional[float],
     leg_outcome: str,
 ):
     """
@@ -707,8 +707,8 @@ def flatten_existing_positions_before_round(
     market_id: str,
     yes_token_id: str,
     no_token_id: str,
-    yes_bid: float | None,
-    no_bid: float | None,
+    yes_bid: Optional[float],
+    no_bid: Optional[float],
     tp_increment: float,
     sl_price: float,
     poll_seconds: float = 10.0,
@@ -756,9 +756,9 @@ def flatten_existing_positions_before_round(
     def close_leg(
         leg_name: str,
         size: float,
-        avg_price: float | None,
+        avg_price: Optional[float],
         token_id: str,
-        current_bid: float | None,
+        current_bid: Optional[float],
     ):
         if size <= 0.0:
             return
@@ -927,7 +927,7 @@ def main():
     shm_reader = ShmRingReader(SHM_NAME)
     print(f"[MAIN] attached shm: {SHM_NAME}")
 
-    current_bucket_ts: int | None = None
+    current_bucket_ts: Optional[int] = None
     market_id = None
     yes_token_id = None
     no_token_id = None
