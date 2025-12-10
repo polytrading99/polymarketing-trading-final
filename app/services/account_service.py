@@ -53,7 +53,10 @@ def get_polymarket_client():
             signature_type = 1
         
         from state_machine.polymarket_client import PolymarketClient
-        from strategy.time_bucket_mm import CLOB_HOST
+        
+        # Use CLOB host directly instead of importing from time_bucket_mm
+        # (which tries to access CONFIG["api"] at import time)
+        CLOB_HOST = "https://clob.polymarket.com"
         
         client = PolymarketClient(
             host=CLOB_HOST,
