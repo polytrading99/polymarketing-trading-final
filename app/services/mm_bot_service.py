@@ -78,11 +78,19 @@ def start_bot() -> bool:
             
             # Start trade.py (data feed) first
             logger.info("Starting trade.py (data feed)...")
+            
+            # Create log directory if it doesn't exist
+            log_dir = BOT_DIR.parent / "logs"
+            log_dir.mkdir(exist_ok=True)
+            
+            # Open log file for trade.py
+            trade_log = open(log_dir / "trade.log", "a")
+            
             _trade_process = subprocess.Popen(
                 ["python", str(TRADE_SCRIPT)],
                 cwd=str(BOT_DIR),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=trade_log,
+                stderr=subprocess.STDOUT,  # Combine stderr into stdout
                 env=os.environ.copy()
             )
             
@@ -92,13 +100,39 @@ def start_bot() -> bool:
             
             # Start main_final.py (trading bot)
             logger.info("Starting main_final.py (trading bot)...")
+            
+            # Create log directory if it doesn't exist
+            log_dir = BOT_DIR.parent / "logs"
+            log_dir.mkdir(exist_ok=True)
+            
+            # Open log files
+            main_log = open(log_dir / "mm_main.log", "a")
+            trade_log = open(log_dir / "trade.log", "a")
+            
             _bot_process = subprocess.Popen(
                 ["python", str(MAIN_SCRIPT)],
                 cwd=str(BOT_DIR),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=main_log,
+                stderr=subprocess.STDOUT,  # Combine stderr into stdout
                 env=os.environ.copy()
             )
+            
+            # Check if process immediately crashed
+            import time
+            time.sleep(1)
+            if _bot_process.poll() is not None:
+                # Process crashed immediately, read the log
+                main_log.flush()
+                main_log.seek(0)
+                error_output = main_log.read()
+                main_log.close()
+                trade_log.close()
+                logger.error(f"Bot process crashed immediately with code {_bot_process.returncode}")
+                logger.error(f"Error output: {error_output[:1000]}")  # First 1000 chars
+                _bot_process = None
+                _trade_process = None
+                _is_running = False
+                return False
             
             _is_running = True
             logger.info("Bot started successfully")
