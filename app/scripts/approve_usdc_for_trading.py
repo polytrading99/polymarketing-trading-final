@@ -168,7 +168,11 @@ else:
         
         # Send transaction
         print("\nSending approval transaction...")
-        tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+        # Handle both old and new eth_account versions
+        raw_tx = getattr(signed_txn, 'rawTransaction', None) or getattr(signed_txn, 'raw_transaction', None)
+        if raw_tx is None:
+            raise ValueError("Could not find raw transaction data in signed transaction")
+        tx_hash = w3.eth.send_raw_transaction(raw_tx)
         print(f"✓ Transaction sent: {tx_hash.hex()}")
         print(f"  View on PolygonScan: https://polygonscan.com/tx/{tx_hash.hex()}")
         
