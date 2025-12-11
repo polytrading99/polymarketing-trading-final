@@ -110,15 +110,56 @@ wallet_address = account.address
 print(f"Wallet Address (from PK): {wallet_address}")
 print(f"Proxy Address (from env): {proxy_address}")
 
+# Check which address has USDC
+usdc_contract_temp = w3.eth.contract(
+    address=Web3.to_checksum_address(USDC_ADDRESS),
+    abi=erc20_abi
+)
+
+wallet_balance = usdc_contract_temp.functions.balanceOf(Web3.to_checksum_address(wallet_address)).call()
+proxy_balance = usdc_contract_temp.functions.balanceOf(Web3.to_checksum_address(proxy_address)).call()
+
+decimals_temp = usdc_contract_temp.functions.decimals().call()
+wallet_balance_usd = wallet_balance / (10 ** decimals_temp)
+proxy_balance_usd = proxy_balance / (10 ** decimals_temp)
+
+print(f"\nUSDC Balances:")
+print(f"  Wallet ({wallet_address}): ${wallet_balance_usd:,.2f}")
+print(f"  Proxy ({proxy_address}): ${proxy_balance_usd:,.2f}")
+
 # Determine which address to use for approval
-# If proxy_address is different from wallet_address, use wallet_address (the one with the private key)
-# If they're the same or proxy is not set, use wallet_address
+# The bot uses proxy_address for trading (signature_type=2), so we need to approve from proxy
+# But we can only sign from wallet_address (we have its private key)
+# So we need to approve from proxy_address, but sign with wallet_address's key
+# This only works if wallet_address has MATIC for gas
+
 if proxy_address and proxy_address.lower() != wallet_address.lower():
-    print(f"⚠️  Proxy address differs from wallet address")
-    print(f"   Using wallet address for approval (the one with private key)")
-    trading_address = Web3.to_checksum_address(wallet_address)
+    print(f"\n⚠️  Proxy address differs from wallet address")
+    print(f"   Bot uses proxy address for trading (signature_type=2)")
+    
+    # Check MATIC balance of wallet address
+    wallet_matic = w3.eth.get_balance(Web3.to_checksum_address(wallet_address))
+    wallet_matic_eth = wallet_matic / 1e18
+    
+    if wallet_matic == 0:
+        print(f"\n✗ ERROR: Wallet address has 0 MATIC!")
+        print(f"   Wallet needs MATIC to pay for gas fees.")
+        print(f"   Send some MATIC to: {wallet_address}")
+        print(f"   You can get MATIC from: https://faucet.polygon.technology/")
+        print(f"\n   Or if proxy address has MATIC, you may need to approve manually via MetaMask")
+        sys.exit(1)
+    
+    print(f"   Wallet MATIC balance: {wallet_matic_eth:.6f} MATIC")
+    
+    # Use proxy address for approval (where USDC is)
+    # But sign from wallet address (where private key is)
+    trading_address = Web3.to_checksum_address(proxy_address)
+    signing_address = Web3.to_checksum_address(wallet_address)
+    print(f"   Approving USDC from: {trading_address} (proxy - has USDC)")
+    print(f"   Signing transaction from: {signing_address} (wallet - has private key)")
 else:
     trading_address = Web3.to_checksum_address(wallet_address)
+    signing_address = Web3.to_checksum_address(wallet_address)
 
 exchange_address = Web3.to_checksum_address(exchange_address)
 print(f"\nApproving from: {trading_address}")
@@ -153,12 +194,30 @@ else:
     
     try:
         # Build transaction
+        # IMPORTANT: We can only approve from the address that owns the USDC
+        # But we can only sign with the wallet address's private key
+        # So trading_address MUST be the same as signing_address (wallet_address)
+        # OR trading_address must be controlled by the same private key
+        
+        # If they're different, we need to approve from wallet_address
+        # But first, we need to ensure wallet_address has USDC OR we need MATIC in wallet_address
+        if trading_address.lower() != signing_address.lower():
+            print(f"\n⚠️  WARNING: Proxy address has USDC but wallet address has private key")
+            print(f"   We can only approve from wallet address (we have its private key)")
+            print(f"   If proxy address has USDC, you may need to transfer USDC to wallet address first")
+            print(f"   OR approve manually from proxy address if you have its private key")
+            
+            # Try to approve from wallet address anyway (in case USDC was moved)
+            approve_from = signing_address
+        else:
+            approve_from = trading_address
+        
         approve_txn = usdc_contract.functions.approve(
             exchange_address,
             max_approval
         ).build_transaction({
-            'from': trading_address,
-            'nonce': w3.eth.get_transaction_count(trading_address),
+            'from': approve_from,  # Must match the address we're signing with
+            'nonce': w3.eth.get_transaction_count(signing_address),
             'gas': 100000,
             'gasPrice': w3.eth.gas_price,
         })
