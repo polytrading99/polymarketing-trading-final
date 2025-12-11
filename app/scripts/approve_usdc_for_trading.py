@@ -108,11 +108,21 @@ account = Account.from_key(pk)
 wallet_address = account.address
 
 print(f"Wallet Address (from PK): {wallet_address}")
-print(f"Trading Address (proxy): {proxy_address}")
+print(f"Proxy Address (from env): {proxy_address}")
 
-# Use proxy address for approval (this is the address that holds funds)
-trading_address = Web3.to_checksum_address(proxy_address)
+# Determine which address to use for approval
+# If proxy_address is different from wallet_address, use wallet_address (the one with the private key)
+# If they're the same or proxy is not set, use wallet_address
+if proxy_address and proxy_address.lower() != wallet_address.lower():
+    print(f"⚠️  Proxy address differs from wallet address")
+    print(f"   Using wallet address for approval (the one with private key)")
+    trading_address = Web3.to_checksum_address(wallet_address)
+else:
+    trading_address = Web3.to_checksum_address(wallet_address)
+
 exchange_address = Web3.to_checksum_address(exchange_address)
+print(f"\nApproving from: {trading_address}")
+print(f"Approving to: {exchange_address}")
 
 # Check current allowance
 usdc_contract = w3.eth.contract(
