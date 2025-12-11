@@ -278,4 +278,40 @@ export async function getAccountSummary(): Promise<AccountSummary> {
   return res.json();
 }
 
+// Credentials API
+export type CredentialsInfo = {
+  private_key_masked: string;
+  proxy_address: string;
+  signature_type: number;
+  has_credentials: boolean;
+};
+
+export async function getCredentials(): Promise<CredentialsInfo> {
+  const res = await fetch(`${API_BASE}/mm-bot/credentials`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch credentials: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function updateCredentials(
+  privateKey: string,
+  proxyAddress: string,
+  signatureType: number = 2
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/mm-bot/credentials`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      private_key: privateKey,
+      proxy_address: proxyAddress,
+      signature_type: signatureType,
+    }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Failed to update credentials" }));
+    throw new Error(error.detail || "Failed to update credentials");
+  }
+}
+
 

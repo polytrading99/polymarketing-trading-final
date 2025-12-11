@@ -367,6 +367,39 @@ def update_config(config_updates: Dict[str, Any]) -> None:
     logger.info("Configuration updated. Restart bot to apply changes.")
 
 
+def update_credentials(private_key: str, proxy_address: str, signature_type: int = 2) -> None:
+    """Update bot credentials (private key and proxy address)."""
+    config = load_config()
+    
+    # Ensure api section exists
+    if "api" not in config:
+        config["api"] = {}
+    
+    # Validate inputs
+    if not private_key or private_key.strip().upper() in ("API", "NOT SET", "NONE", ""):
+        raise ValueError("Private key cannot be empty or placeholder")
+    
+    if not proxy_address or proxy_address.strip().upper() in ("WALLET API", "NOT SET", "NONE", "NULL", ""):
+        raise ValueError("Proxy address cannot be empty or placeholder")
+    
+    # Validate signature_type
+    try:
+        signature_type = int(signature_type)
+        if signature_type not in (1, 2, None):
+            signature_type = 2  # Default to 2
+    except (ValueError, TypeError):
+        signature_type = 2
+    
+    # Update credentials
+    config["api"]["PRIVATE_KEY"] = private_key.strip()
+    config["api"]["PROXY_ADDRESS"] = proxy_address.strip()
+    config["api"]["SIGNATURE_TYPE"] = signature_type
+    
+    # Save config
+    save_config(config)
+    logger.info("Credentials updated successfully")
+
+
 def restart_bot() -> bool:
     """Restart the bot."""
     logger.info("Restarting bot...")

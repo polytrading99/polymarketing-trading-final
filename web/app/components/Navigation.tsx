@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Database, Bot } from "lucide-react";
+import { Database, Bot, Settings } from "lucide-react";
 import clsx from "clsx";
 
 export function Navigation() {
@@ -11,6 +11,7 @@ export function Navigation() {
   const navItems = [
     { href: "/", label: "Markets", icon: Database },
     { href: "/mm-bot", label: "MM Bot", icon: Bot },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (

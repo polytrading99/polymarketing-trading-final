@@ -11,6 +11,7 @@ from app.services.mm_bot_service import (
     get_bot_status,
     get_config,
     update_config,
+    update_credentials,
     restart_bot,
 )
 from app.services.account_service import (
@@ -26,6 +27,13 @@ router = APIRouter()
 class ConfigUpdate(BaseModel):
     """Partial config update model."""
     config: Dict[str, Any]
+
+
+class CredentialsUpdate(BaseModel):
+    """Credentials update model."""
+    private_key: str
+    proxy_address: str
+    signature_type: int = 2
 
 
 @router.post("/start", status_code=status.HTTP_200_OK, summary="Start the MM bot")
@@ -111,4 +119,45 @@ async def get_open_orders_endpoint() -> Dict[str, Any]:
 async def get_account_summary_endpoint() -> Dict[str, Any]:
     """Get complete account summary: balance, positions, and orders."""
     return get_account_summary()
+
+
+@router.put("/credentials", summary="Update bot credentials")
+async def update_mm_bot_credentials(update: CredentialsUpdate) -> Dict[str, Any]:
+    """Update the bot credentials (private key and proxy address)."""
+    try:
+        update_credentials(
+            private_key=update.private_key,
+            proxy_address=update.proxy_address,
+            signature_type=update.signature_type
+        )
+        return {"status": "updated", "message": "Credentials updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update credentials: {str(e)}"
+        )
+
+
+@router.get("/credentials", summary="Get bot credentials (masked)")
+async def get_mm_bot_credentials() -> Dict[str, Any]:
+    """Get the current bot credentials (masked for security)."""
+    config = get_config()
+    api_cfg = config.get("api", {})
+    
+    private_key = api_cfg.get("PRIVATE_KEY", "")
+    proxy_address = api_cfg.get("PROXY_ADDRESS", "")
+    
+    # Mask private key (show first 6 and last 4 chars)
+    masked_pk = ""
+    if private_key and len(private_key) > 10:
+        masked_pk = f"{private_key[:6]}...{private_key[-4:]}"
+    elif private_key:
+        masked_pk = "***"
+    
+    return {
+        "private_key_masked": masked_pk,
+        "proxy_address": proxy_address,
+        "signature_type": api_cfg.get("SIGNATURE_TYPE", 2),
+        "has_credentials": bool(private_key and proxy_address and private_key.upper() not in ("API", "NOT SET", "NONE", "") and proxy_address.upper() not in ("WALLET API", "NOT SET", "NONE", "NULL", ""))
+    }
 
