@@ -71,7 +71,7 @@ except Exception as e:
     exchange_address = "0x4bfb41d5b3570dfe3a6c6c0c11b55b319906cb0a"
     print(f"Using default Exchange address: {exchange_address}")
 
-# ERC20 ABI for approve and allowance
+# ERC20 ABI for approve, allowance, balanceOf, and decimals
 erc20_abi = [
     {
         "constant": False,
@@ -90,6 +90,15 @@ erc20_abi = [
             {"name": "_spender", "type": "address"}
         ],
         "name": "allowance",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "type": "function"
+    },
+    {
+        "constant": True,
+        "inputs": [
+            {"name": "_owner", "type": "address"}
+        ],
+        "name": "balanceOf",
         "outputs": [{"name": "", "type": "uint256"}],
         "type": "function"
     },
