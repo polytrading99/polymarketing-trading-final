@@ -37,6 +37,7 @@ services:
       LOG_LEVEL: INFO
       PK: ${PK}
       BROWSER_ADDRESS: ${BROWSER_ADDRESS}
+      SIGNATURE_TYPE: ${SIGNATURE_TYPE:-2}
       SPREADSHEET_URL: ${SPREADSHEET_URL:-}
     depends_on:
       postgres:
