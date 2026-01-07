@@ -10,7 +10,7 @@ export function Navigation() {
 
   const navItems = [
     { href: "/", label: "Markets", icon: Database },
-    { href: "/mm-bot", label: "MM Bot", icon: Bot },
+    { href: "/trading", label: "Trading", icon: Bot },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

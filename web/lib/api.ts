@@ -314,4 +314,38 @@ export async function updateCredentials(
   }
 }
 
+// Trading Status API
+export type TradingStatus = {
+  success: boolean;
+  positions?: Record<string, {
+    size: number;
+    avgPrice: number;
+    value: number;
+  }>;
+  orders?: Record<string, {
+    buy: { price: number; size: number };
+    sell: { price: number; size: number };
+  }>;
+  performing_trades?: Record<string, any>;
+  market_data?: Record<string, {
+    asset_id: string;
+    best_bid: number;
+    best_ask: number;
+    bid_size: number;
+    ask_size: number;
+  }>;
+  total_positions: number;
+  total_orders: number;
+  active_markets: number;
+  error?: string;
+};
+
+export async function getTradingStatus(): Promise<TradingStatus> {
+  const res = await fetch(`${API_BASE}/trading/status`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch trading status: ${res.status}`);
+  }
+  return res.json();
+}
+
 
