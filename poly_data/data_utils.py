@@ -288,10 +288,15 @@ def sync_markets_from_database():
                 await engine.dispose()
                 return pd.DataFrame(market_data) if market_data else pd.DataFrame()
                 
-            except (ImportError, AttributeError, ValueError, TypeError, Exception) as e:
+            except Exception as e:
                 # Catch all errors including Settings validation errors
-                print(f"Error loading markets from database: {type(e).__name__}: {e}")
-                # Don't print full traceback - just return empty DataFrame
+                error_msg = str(e) if e else "Unknown error"
+                error_type = type(e).__name__ if e else "Unknown"
+                print(f"Error loading markets from database: {error_type}: {error_msg}")
+                # Don't print full traceback for Settings errors - they're expected
+                if "Settings" not in error_type and "validation" not in error_msg.lower():
+                    import traceback
+                    traceback.print_exc()
                 return pd.DataFrame()
         
         # Use ThreadPoolExecutor to run async code in a separate thread
