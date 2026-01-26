@@ -225,62 +225,73 @@ def sync_markets_from_database():
         
         async def _load_active_markets():
             try:
-                # Try to import and use database components
-                # If Settings validation fails, we'll catch it and return empty DataFrame
-                from app.config import ConfigRepository
-                from app.database.session import get_session
-                from app.database.models import MarketConfig
-                
-                repository = ConfigRepository()
-                markets = await repository.list_markets(active_only=True)
-            except (ImportError, AttributeError, ValueError, TypeError) as e:
-                # Catch Settings validation errors and other import/init errors
-                print(f"Error loading markets from database (Settings/config issue): {e}")
-                # Don't print full traceback for Settings errors - they're expected in some environments
-                return pd.DataFrame()
-            except Exception as e:
-                # For other errors, print full traceback
-                print(f"Error loading markets from database: {e}")
-                import traceback
-                traceback.print_exc()
-                return pd.DataFrame()
-            
-            # Get market configs with their parameters
-            async with get_session() as session:
+                # Bypass Settings validation by using environment variables directly
+                import os
+                from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+                from sqlalchemy.orm import sessionmaker
                 from sqlalchemy import select
                 
-                market_data = []
-                for market in markets:
-                    # Get active config for this market
-                    config_stmt = select(MarketConfig).where(
-                        MarketConfig.market_id == market.id,
-                        MarketConfig.is_active == True
-                    )
-                    config = await session.scalar(config_stmt)
-                    
-                    if config:
-                        # Get strategy name for param_type, default to "default"
-                        param_type = "default"
-                        if config.strategy:
-                            param_type = config.strategy.name
-                        
-                        market_data.append({
-                            'question': market.question,
-                            'condition_id': market.condition_id,
-                            'token1': market.token_yes,
-                            'token2': market.token_no,
-                            'neg_risk': market.neg_risk,
-                            'tick_size': float(config.tick_size) if config.tick_size else 0.01,
-                            'min_size': float(config.min_size) if config.min_size else 0,
-                            'max_size': float(config.max_size) if config.max_size else None,
-                            'max_spread': float(config.max_spread) if config.max_spread else 5.0,
-                            'trade_size': float(config.trade_size) if config.trade_size else 1.0,
-                            'param_type': param_type,
-                            'answer1': 'YES',  # Default answers
-                            'answer2': 'NO',
-                        })
+                # Get database URL directly from environment
+                database_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://poly:poly@postgres:5432/poly")
                 
+                # Create engine and session directly (bypassing Settings)
+                engine = create_async_engine(database_url, echo=False)
+                async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+                
+                # Import models
+                from app.database.models import Market, MarketConfig, Strategy
+                
+                market_data = []
+                async with async_session() as session:
+                    # Get active markets directly
+                    from sqlalchemy import and_
+                    markets_stmt = select(Market).where(Market.status == "active")
+                    markets_result = await session.execute(markets_stmt)
+                    markets = markets_result.scalars().all()
+                    
+                    for market in markets:
+                        # Get active config for this market
+                        config_stmt = select(MarketConfig).where(
+                            MarketConfig.market_id == market.id,
+                            MarketConfig.is_active == True
+                        )
+                        config_result = await session.execute(config_stmt)
+                        config = config_result.scalar_one_or_none()
+                        
+                        if config:
+                            # Get strategy name for param_type, default to "default"
+                            param_type = "default"
+                            if config.strategy_id:
+                                strategy_stmt = select(Strategy).where(Strategy.id == config.strategy_id)
+                                strategy_result = await session.execute(strategy_stmt)
+                                strategy = strategy_result.scalar_one_or_none()
+                                if strategy:
+                                    param_type = strategy.name
+                            
+                            market_data.append({
+                                'question': market.question,
+                                'condition_id': market.condition_id,
+                                'token1': market.token_yes,
+                                'token2': market.token_no,
+                                'neg_risk': market.neg_risk,
+                                'tick_size': float(config.tick_size) if config.tick_size else 0.01,
+                                'min_size': float(config.min_size) if config.min_size else 0,
+                                'max_size': float(config.max_size) if config.max_size else None,
+                                'max_spread': float(config.max_spread) if config.max_spread else 5.0,
+                                'trade_size': float(config.trade_size) if config.trade_size else 1.0,
+                                'param_type': param_type,
+                                'answer1': 'YES',  # Default answers
+                                'answer2': 'NO',
+                            })
+                
+                await engine.dispose()
                 return pd.DataFrame(market_data) if market_data else pd.DataFrame()
+                
+            except (ImportError, AttributeError, ValueError, TypeError, Exception) as e:
+                # Catch all errors including Settings validation errors
+                print(f"Error loading markets from database: {type(e).__name__}: {e}")
+                # Don't print full traceback - just return empty DataFrame
+                return pd.DataFrame()
         
         # Use ThreadPoolExecutor to run async code in a separate thread
         # This avoids event loop conflicts when called from an async context
