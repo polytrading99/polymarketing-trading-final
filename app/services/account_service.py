@@ -23,6 +23,8 @@ def get_polymarket_client():
         private_key = os.environ.get("PK")
         proxy_address = os.environ.get("BROWSER_ADDRESS")
         
+        logger.info(f"Creating PolymarketClient - PK present: {bool(private_key)}, Address: {proxy_address[:10] if proxy_address else 'None'}...")
+        
         if not private_key or private_key.upper() in ("API", "NOT SET", "NONE", ""):
             raise ValueError("PRIVATE_KEY not set or is placeholder. Set PK environment variable.")
         
@@ -34,9 +36,10 @@ def get_polymarket_client():
         # New bot's client loads everything from environment
         client = PolymarketClient()
         
+        logger.info(f"PolymarketClient created successfully for wallet: {client.browser_wallet}")
         return client
     except Exception as e:
-        logger.error(f"Failed to create PolymarketClient: {e}")
+        logger.error(f"Failed to create PolymarketClient: {e}", exc_info=True)
         raise
 
 
@@ -47,6 +50,8 @@ def get_account_balance() -> Dict[str, Any]:
         
         # Use the correct method name: get_usdc_balance()
         usdc_balance = client.get_usdc_balance()
+        
+        logger.info(f"Retrieved USDC balance: {usdc_balance} for wallet: {client.browser_wallet}")
         
         if isinstance(usdc_balance, (int, float)):
             return {
@@ -59,7 +64,7 @@ def get_account_balance() -> Dict[str, Any]:
         
         return {
             "success": False,
-            "error": "Could not retrieve balance",
+            "error": f"Unexpected balance type: {type(usdc_balance)}",
             "balance": {
                 "usdc": 0.0,
                 "currency": "USDC"

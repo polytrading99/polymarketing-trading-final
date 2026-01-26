@@ -141,11 +141,11 @@ async def update_mm_bot_credentials(update: CredentialsUpdate) -> Dict[str, Any]
 @router.get("/credentials", summary="Get bot credentials (masked)")
 async def get_mm_bot_credentials() -> Dict[str, Any]:
     """Get the current bot credentials (masked for security)."""
-    config = get_config()
-    api_cfg = config.get("api", {})
-    
-    private_key = api_cfg.get("PRIVATE_KEY", "")
-    proxy_address = api_cfg.get("PROXY_ADDRESS", "")
+    # Get from environment variables directly (what's actually being used)
+    import os
+    private_key = os.environ.get("PK", "")
+    proxy_address = os.environ.get("BROWSER_ADDRESS", "")
+    signature_type = int(os.environ.get("SIGNATURE_TYPE", "2"))
     
     # Mask private key (show first 6 and last 4 chars)
     masked_pk = ""
@@ -157,7 +157,7 @@ async def get_mm_bot_credentials() -> Dict[str, Any]:
     return {
         "private_key_masked": masked_pk,
         "proxy_address": proxy_address,
-        "signature_type": api_cfg.get("SIGNATURE_TYPE", 2),
+        "signature_type": signature_type,
         "has_credentials": bool(private_key and proxy_address and private_key.upper() not in ("API", "NOT SET", "NONE", "") and proxy_address.upper() not in ("WALLET API", "NOT SET", "NONE", "NULL", ""))
     }
 
