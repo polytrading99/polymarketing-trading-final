@@ -397,22 +397,47 @@ def update_markets():
             global_state.df[col] = default_val
 
     # Process markets to set up tokens and reverse mappings
-    for idx, row in global_state.df.iterrows():
-        # Convert token columns to strings (modify DataFrame directly, not Series)
-        token1 = str(row['token1'])
-        token2 = str(row['token2'])
-        global_state.df.at[idx, 'token1'] = token1
-        global_state.df.at[idx, 'token2'] = token2
+    try:
+        for idx, row in global_state.df.iterrows():
+            try:
+                # Convert token columns to strings (modify DataFrame directly, not Series)
+                # Use .get() with defaults to avoid KeyError
+                token1_val = row.get('token1') if hasattr(row, 'get') else row['token1']
+                token2_val = row.get('token2') if hasattr(row, 'get') else row['token2']
+                
+                # Handle case where values might be None or NaN
+                if pd.isna(token1_val) or token1_val is None:
+                    print(f"Warning: token1 is None/NaN for row {idx}, skipping")
+                    continue
+                if pd.isna(token2_val) or token2_val is None:
+                    print(f"Warning: token2 is None/NaN for row {idx}, skipping")
+                    continue
+                
+                token1 = str(token1_val)
+                token2 = str(token2_val)
+                
+                # Update DataFrame
+                global_state.df.at[idx, 'token1'] = token1
+                global_state.df.at[idx, 'token2'] = token2
 
-        if token1 not in global_state.all_tokens:
-            global_state.all_tokens.append(token1)
+                if token1 not in global_state.all_tokens:
+                    global_state.all_tokens.append(token1)
 
-        if token1 not in global_state.REVERSE_TOKENS:
-            global_state.REVERSE_TOKENS[token1] = token2
+                if token1 not in global_state.REVERSE_TOKENS:
+                    global_state.REVERSE_TOKENS[token1] = token2
 
-        if token2 not in global_state.REVERSE_TOKENS:
-            global_state.REVERSE_TOKENS[token2] = token1
+                if token2 not in global_state.REVERSE_TOKENS:
+                    global_state.REVERSE_TOKENS[token2] = token1
 
-        for col2 in [f"{token1}_buy", f"{token1}_sell", f"{token2}_buy", f"{token2}_sell"]:
-            if col2 not in global_state.performing:
-                global_state.performing[col2] = set()
+                for col2 in [f"{token1}_buy", f"{token1}_sell", f"{token2}_buy", f"{token2}_sell"]:
+                    if col2 not in global_state.performing:
+                        global_state.performing[col2] = set()
+            except (KeyError, TypeError, AttributeError) as e:
+                print(f"Error processing market row {idx}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+    except Exception as e:
+        print(f"Error in market processing loop: {e}")
+        import traceback
+        traceback.print_exc()
