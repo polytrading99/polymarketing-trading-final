@@ -19,8 +19,15 @@ def process_book_data(asset, json_data):
     global_state.all_data[asset]['asks'].update({float(entry['price']): float(entry['size']) for entry in json_data['asks']})
 
 def process_price_change(asset, side, price_level, new_size):
-    if asset_id != global_state.all_data[asset]['asset_id']:
-        return  # skip updates for the No token to prevent duplicated updates
+    # Ensure asset exists in all_data before processing
+    if asset not in global_state.all_data:
+        return
+    
+    # Check if this is the correct asset_id (skip No token updates to prevent duplicates)
+    if 'asset_id' in global_state.all_data[asset]:
+        if asset != global_state.all_data[asset]['asset_id']:
+            return  # skip updates for the No token to prevent duplicated updates
+    
     if side == 'bids':
         book = global_state.all_data[asset]['bids']
     else:
