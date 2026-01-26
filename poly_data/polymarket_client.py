@@ -50,6 +50,7 @@ class PolymarketClient:
         # Get credentials from environment variables
         key=os.getenv("PK")
         browser_address = os.getenv("BROWSER_ADDRESS")
+        signature_type = int(os.getenv("SIGNATURE_TYPE", "2"))
 
         # Don't print sensitive wallet information
         print("Initializing Polymarket client...")
@@ -62,7 +63,7 @@ class PolymarketClient:
             key=key,
             chain_id=chain_id,
             funder=self.browser_wallet,
-            signature_type=2
+            signature_type=signature_type
         )
 
         # Set up API credentials
