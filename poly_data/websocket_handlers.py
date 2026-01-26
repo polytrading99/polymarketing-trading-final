@@ -35,9 +35,17 @@ async def connect_market_websocket(chunk):
             # Process incoming market data indefinitely
             while True:
                 message = await websocket.recv()
-                json_data = json.loads(message)
-                # Process order book updates and trigger trading as needed
-                process_data(json_data)
+                try:
+                    json_data = json.loads(message)
+                    # Process order book updates and trigger trading as needed
+                    process_data(json_data)
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing JSON in market websocket: {e}, message: {message[:200]}")
+                    continue
+                except Exception as e:
+                    print(f"Error processing market websocket message: {e}")
+                    print(traceback.format_exc())
+                    continue
         except websockets.ConnectionClosed:
             print("Connection closed in market websocket")
             print(traceback.format_exc())
@@ -84,9 +92,17 @@ async def connect_user_websocket():
             # Process incoming user data indefinitely
             while True:
                 message = await websocket.recv()
-                json_data = json.loads(message)
-                # Process trade and order updates
-                process_user_data(json_data)
+                try:
+                    json_data = json.loads(message)
+                    # Process trade and order updates
+                    process_user_data(json_data)
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing JSON in user websocket: {e}, message: {message[:200]}")
+                    continue
+                except Exception as e:
+                    print(f"Error processing user websocket message: {e}")
+                    print(traceback.format_exc())
+                    continue
         except websockets.ConnectionClosed:
             print("Connection closed in user websocket")
             print(traceback.format_exc())
