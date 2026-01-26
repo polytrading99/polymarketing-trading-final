@@ -426,6 +426,14 @@ export type TradingStatus = {
   total_positions: number;
   total_orders: number;
   active_markets: number;
+  active_markets_list?: Array<{
+    condition_id: string;
+    question: string;
+    token1?: string;
+    token2?: string;
+  }>;
+  websocket_connected?: boolean;
+  all_tokens?: string[];
   error?: string;
 };
 
