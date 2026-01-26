@@ -397,19 +397,22 @@ def update_markets():
             global_state.df[col] = default_val
 
     # Process markets to set up tokens and reverse mappings
-    for _, row in global_state.df.iterrows():
-        for col in ['token1', 'token2']:
-            row[col] = str(row[col])
+    for idx, row in global_state.df.iterrows():
+        # Convert token columns to strings (modify DataFrame directly, not Series)
+        token1 = str(row['token1'])
+        token2 = str(row['token2'])
+        global_state.df.at[idx, 'token1'] = token1
+        global_state.df.at[idx, 'token2'] = token2
 
-        if row['token1'] not in global_state.all_tokens:
-            global_state.all_tokens.append(row['token1'])
+        if token1 not in global_state.all_tokens:
+            global_state.all_tokens.append(token1)
 
-        if row['token1'] not in global_state.REVERSE_TOKENS:
-            global_state.REVERSE_TOKENS[row['token1']] = row['token2']
+        if token1 not in global_state.REVERSE_TOKENS:
+            global_state.REVERSE_TOKENS[token1] = token2
 
-        if row['token2'] not in global_state.REVERSE_TOKENS:
-            global_state.REVERSE_TOKENS[row['token2']] = row['token1']
+        if token2 not in global_state.REVERSE_TOKENS:
+            global_state.REVERSE_TOKENS[token2] = token1
 
-        for col2 in [f"{row['token1']}_buy", f"{row['token1']}_sell", f"{row['token2']}_buy", f"{row['token2']}_sell"]:
+        for col2 in [f"{token1}_buy", f"{token1}_sell", f"{token2}_buy", f"{token2}_sell"]:
             if col2 not in global_state.performing:
                 global_state.performing[col2] = set()
