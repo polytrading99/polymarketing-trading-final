@@ -400,10 +400,9 @@ def update_markets():
     try:
         for idx, row in global_state.df.iterrows():
             try:
-                # Convert token columns to strings (modify DataFrame directly, not Series)
-                # Use .get() with defaults to avoid KeyError
-                token1_val = row.get('token1') if hasattr(row, 'get') else row['token1']
-                token2_val = row.get('token2') if hasattr(row, 'get') else row['token2']
+                # Access DataFrame directly instead of Series to avoid issues
+                token1_val = global_state.df.at[idx, 'token1']
+                token2_val = global_state.df.at[idx, 'token2']
                 
                 # Handle case where values might be None or NaN
                 if pd.isna(token1_val) or token1_val is None:
@@ -416,7 +415,7 @@ def update_markets():
                 token1 = str(token1_val)
                 token2 = str(token2_val)
                 
-                # Update DataFrame
+                # Update DataFrame to ensure strings
                 global_state.df.at[idx, 'token1'] = token1
                 global_state.df.at[idx, 'token2'] = token2
 
@@ -433,7 +432,7 @@ def update_markets():
                     if col2 not in global_state.performing:
                         global_state.performing[col2] = set()
             except (KeyError, TypeError, AttributeError) as e:
-                print(f"Error processing market row {idx}: {e}")
+                print(f"Error processing market row {idx}: {type(e).__name__}: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
