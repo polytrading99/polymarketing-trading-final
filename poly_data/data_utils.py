@@ -303,7 +303,29 @@ def update_markets():
         print(f"Loaded {len(db_df)} active markets from database")
         # Use database markets
         global_state.df = db_df.copy()
-        global_state.params = {}  # No params from database for now
+        
+        # Initialize default parameters if not already set
+        if not global_state.params:
+            # Default trading parameters
+            global_state.params = {
+                "default": {
+                    "stop_loss_threshold": -5.0,  # Stop loss at -5%
+                    "take_profit_threshold": 2.0,  # Take profit at +2%
+                    "spread_threshold": 0.02,  # Max spread for stop loss (2 cents)
+                    "volatility_threshold": 10.0,  # Max volatility
+                    "sleep_period": 1,  # Hours to wait after stop loss
+                }
+            }
+        else:
+            # Ensure "default" param_type exists
+            if "default" not in global_state.params:
+                global_state.params["default"] = {
+                    "stop_loss_threshold": -5.0,
+                    "take_profit_threshold": 2.0,
+                    "spread_threshold": 0.02,
+                    "volatility_threshold": 10.0,
+                    "sleep_period": 1,
+                }
     else:
         # Fallback to Polymarket API or Google Sheets
         received_df, received_params = fetch_markets_from_polymarket()
