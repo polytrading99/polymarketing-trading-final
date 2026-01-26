@@ -375,6 +375,9 @@ async def perform_trade(market_or_token):
                 # Get max_size, defaulting to trade_size if not specified
                 max_size = row.get('max_size', row['trade_size'])
                 
+                # Debug logging
+                print(f"BUY CHECK: position={position}, max_size={max_size}, buy_amount={buy_amount}, min_size={row['min_size']}")
+                
                 # Only buy if:
                 # 1. Position is less than max_size (new logic)
                 # 2. Position is less than absolute cap (250)
