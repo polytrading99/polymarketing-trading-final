@@ -225,13 +225,21 @@ def sync_markets_from_database():
         
         async def _load_active_markets():
             try:
+                # Try to import and use database components
+                # If Settings validation fails, we'll catch it and return empty DataFrame
                 from app.config import ConfigRepository
                 from app.database.session import get_session
                 from app.database.models import MarketConfig
                 
                 repository = ConfigRepository()
                 markets = await repository.list_markets(active_only=True)
+            except (ImportError, AttributeError, ValueError, TypeError) as e:
+                # Catch Settings validation errors and other import/init errors
+                print(f"Error loading markets from database (Settings/config issue): {e}")
+                # Don't print full traceback for Settings errors - they're expected in some environments
+                return pd.DataFrame()
             except Exception as e:
+                # For other errors, print full traceback
                 print(f"Error loading markets from database: {e}")
                 import traceback
                 traceback.print_exc()
