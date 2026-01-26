@@ -196,7 +196,9 @@ export default function TradingPage() {
           </div>
           {tradingStatus.active_markets_list && tradingStatus.active_markets_list.length > 0 && (
             <div className="mt-4">
-              <div className="text-sm font-semibold text-slate-300 mb-2">Active Markets:</div>
+              <div className="text-sm font-semibold text-slate-300 mb-2">
+                Active Markets ({tradingStatus.active_markets_list.length}):
+              </div>
               <div className="space-y-1">
                 {tradingStatus.active_markets_list.map((market: any, idx: number) => (
                   <div key={idx} className="text-xs text-slate-400 font-mono">
@@ -204,6 +206,18 @@ export default function TradingPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {(!tradingStatus.active_markets_list || tradingStatus.active_markets_list.length === 0) && (
+            <div className="mt-4 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/50 text-sm text-yellow-300">
+              ⚠️ No active markets found. Go to Markets page to activate markets for trading.
+            </div>
+          )}
+          {tradingStatus.df_markets_count !== undefined && (
+            <div className="mt-2 text-xs text-slate-500">
+              Markets in bot: {tradingStatus.df_markets_count} | 
+              WebSocket data: {tradingStatus.all_data_count || 0} | 
+              Tokens subscribed: {tradingStatus.all_tokens?.length || 0}
             </div>
           )}
           {tradingStatus.error && (

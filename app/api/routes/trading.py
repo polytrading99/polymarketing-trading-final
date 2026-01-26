@@ -92,8 +92,10 @@ async def get_trading_status() -> Dict[str, Any]:
                 }
                 for _, row in global_state.df.iterrows()
             ] if hasattr(global_state, 'df') and global_state.df is not None and not global_state.df.empty else [],
-            "websocket_connected": len(global_state.all_tokens) > 0,
-            "all_tokens": global_state.all_tokens,
+            "websocket_connected": len(global_state.all_tokens) > 0 if hasattr(global_state, 'all_tokens') else False,
+            "all_tokens": global_state.all_tokens if hasattr(global_state, 'all_tokens') else [],
+            "df_markets_count": len(global_state.df) if hasattr(global_state, 'df') and global_state.df is not None and not global_state.df.empty else 0,
+            "all_data_count": len(global_state.all_data) if hasattr(global_state, 'all_data') else 0,
         }
     except ImportError:
         return {
