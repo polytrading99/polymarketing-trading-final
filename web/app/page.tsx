@@ -1,8 +1,8 @@
 "use client";
 
 import useSWR from "swr";
-import { ArrowRightCircle, Loader2, RefreshCcw, Play, Square, Database, Globe } from "lucide-react";
-import { fetchMarkets, fetchCurrentPolymarketMarkets, startBot, stopBot, updateMarketStatus, type Market, type PolymarketMarket } from "../lib/api";
+import { ArrowRightCircle, Loader2, RefreshCcw, Play, Square, Database, Globe, Plus } from "lucide-react";
+import { fetchMarkets, fetchCurrentPolymarketMarkets, startBot, stopBot, updateMarketStatus, addMarketToDatabase, type Market, type PolymarketMarket } from "../lib/api";
 import { useCallback, useState } from "react";
 import clsx from "clsx";
 import { DashboardStats, PnLChart } from "./dashboard";
@@ -29,6 +29,55 @@ export default function HomePage() {
     }
   );
   const [loadingMarkets, setLoadingMarkets] = useState<Set<string>>(new Set());
+  const [addingMarkets, setAddingMarkets] = useState<Set<string>>(new Set());
+
+  const onRefresh = useCallback(() => {
+    if (viewMode === "database") {
+      mutate();
+    } else {
+      mutateLive();
+    }
+  }, [mutate, mutateLive, viewMode]);
+
+  const handleAddMarket = useCallback(async (market: PolymarketMarket) => {
+    if (!market.token_yes || !market.token_no || !market.condition_id) {
+      alert("Market is missing required information (tokens or condition_id)");
+      return;
+    }
+    
+    if (addingMarkets.has(market.condition_id)) return;
+    
+    setAddingMarkets(prev => new Set(prev).add(market.condition_id));
+    try {
+      await addMarketToDatabase({
+        question: market.question,
+        condition_id: market.condition_id,
+        token_yes: market.token_yes,
+        token_no: market.token_no,
+        neg_risk: false, // Default to false, can be updated later
+        tick_size: 0.01,
+        trade_size: 1.0,
+        min_size: market.min_size,
+        max_spread: market.max_spread,
+        metadata: {
+          market_slug: market.market_slug,
+          end_date_iso: market.end_date_iso,
+          rewards_daily_rate: market.rewards_daily_rate,
+        }
+      });
+      alert("Market added to database! Switch to Database view to activate it.");
+      await mutate(); // Refresh database markets
+    } catch (err) {
+      console.error("Failed to add market:", err);
+      alert(err instanceof Error ? err.message : "Failed to add market");
+    } finally {
+      setAddingMarkets(prev => {
+        const next = new Set(prev);
+        next.delete(market.condition_id);
+        return next;
+      });
+    }
+  }, [addingMarkets, mutate]);
 
   const onRefresh = useCallback(() => {
     if (viewMode === "database") {
@@ -309,9 +358,28 @@ export default function HomePage() {
                           <h2 className="flex-1 text-lg font-semibold leading-tight text-slate-100 line-clamp-2">
                             {market.question}
                           </h2>
-                          <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/30 shrink-0">
-                            Live
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/30">
+                              Live
+                            </span>
+                            {market.token_yes && market.token_no && (
+                              <button
+                                onClick={() => handleAddMarket(market)}
+                                disabled={addingMarkets.has(market.condition_id)}
+                                className={clsx(
+                                  "rounded-md p-1.5 transition-colors text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300",
+                                  addingMarkets.has(market.condition_id) && "opacity-50 cursor-not-allowed"
+                                )}
+                                title="Add to Database"
+                              >
+                                {addingMarkets.has(market.condition_id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Plus className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                         
                         <div className="space-y-2.5 text-sm">

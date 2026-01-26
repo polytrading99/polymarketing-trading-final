@@ -144,6 +144,20 @@ class PolymarketMarketInfo(BaseModel):
     max_spread: Optional[float] = None
 
 
+class AddMarketRequest(BaseModel):
+    """Request to add a market to the database."""
+    question: str
+    condition_id: str
+    token_yes: str
+    token_no: str
+    neg_risk: bool = False
+    tick_size: Optional[float] = Field(default=0.01)
+    trade_size: Optional[float] = Field(default=1.0)
+    min_size: Optional[float] = None
+    max_spread: Optional[float] = None
+    metadata: Optional[dict] = Field(default_factory=dict)
+
+
 @router.get("/current", response_model=list[PolymarketMarketInfo], summary="Fetch current open markets from Polymarket")
 async def fetch_current_polymarket_markets(
     limit: Optional[int] = Query(default=100, description="Maximum number of markets to fetch")
@@ -266,4 +280,162 @@ async def fetch_current_polymarket_markets(
     markets = await loop.run_in_executor(None, _fetch_markets_sync, limit)
     
     return markets
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, summary="Add a market to the database")
+async def add_market(request: AddMarketRequest) -> MarketSummary:
+    """Add a market from Polymarket to the database for trading."""
+    repository = ConfigRepository()
+    
+    # Check if market already exists
+    existing_markets = await repository.list_markets(active_only=False)
+    existing = next((m for m in existing_markets if m.condition_id == request.condition_id), None)
+    
+    if existing:
+        # Update existing market
+        existing.question = request.question
+        existing.token_yes = request.token_yes
+        existing.token_no = request.token_no
+        existing.neg_risk = request.neg_risk
+        if request.metadata:
+            existing_meta = existing.meta or {}
+            existing_meta.update(request.metadata)
+            existing.meta = existing_meta
+        
+        market = await repository.upsert_market(existing)
+    else:
+        # Create new market
+        from app.database.models import Market
+        market = Market(
+            condition_id=request.condition_id,
+            question=request.question,
+            token_yes=request.token_yes,
+            token_no=request.token_no,
+            neg_risk=request.neg_risk,
+            status="inactive",
+            meta=request.metadata or {}
+        )
+        market = await repository.upsert_market(market)
+    
+    # Create a default strategy config if needed
+    async with get_session() as session:
+        from app.database.models import Strategy, MarketConfig
+        from sqlalchemy import select
+        
+        # Get or create default strategy
+        default_strategy = await session.scalar(
+            select(Strategy).where(Strategy.name == "default")
+        )
+        
+        if not default_strategy:
+            default_strategy = Strategy(
+                name="default",
+                default_params={}
+            )
+            session.add(default_strategy)
+            await session.flush()
+        
+        # Check if config exists
+        config = await session.scalar(
+            select(MarketConfig).where(
+                MarketConfig.market_id == market.id,
+                MarketConfig.strategy_id == default_strategy.id
+            )
+        )
+        
+        if not config:
+            config = MarketConfig(
+                market=market,
+                strategy=default_strategy,
+                is_active=False,
+                tick_size=request.tick_size or 0.01,
+                trade_size=request.trade_size or 1.0,
+                min_size=request.min_size,
+                max_spread=request.max_spread,
+                params={}
+            )
+            session.add(config)
+            await session.commit()
+    
+    summary = await _summarize_market(market)
+    return summary
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, summary="Add a market to the database")
+async def add_market(request: AddMarketRequest) -> MarketSummary:
+    """Add a market from Polymarket to the database for trading."""
+    repository = ConfigRepository()
+    
+    # Check if market already exists
+    existing_markets = await repository.list_markets(active_only=False)
+    existing = next((m for m in existing_markets if m.condition_id == request.condition_id), None)
+    
+    if existing:
+        # Update existing market
+        existing.question = request.question
+        existing.token_yes = request.token_yes
+        existing.token_no = request.token_no
+        existing.neg_risk = request.neg_risk
+        if request.metadata:
+            existing_meta = existing.meta or {}
+            existing_meta.update(request.metadata)
+            existing.meta = existing_meta
+        
+        market = await repository.upsert_market(existing)
+    else:
+        # Create new market
+        from app.database.models import Market
+        market = Market(
+            condition_id=request.condition_id,
+            question=request.question,
+            token_yes=request.token_yes,
+            token_no=request.token_no,
+            neg_risk=request.neg_risk,
+            status="inactive",
+            meta=request.metadata or {}
+        )
+        market = await repository.upsert_market(market)
+    
+    # Create a default strategy config if needed
+    async with get_session() as session:
+        from app.database.models import Strategy, MarketConfig
+        from sqlalchemy import select
+        
+        # Get or create default strategy
+        default_strategy = await session.scalar(
+            select(Strategy).where(Strategy.name == "default")
+        )
+        
+        if not default_strategy:
+            default_strategy = Strategy(
+                name="default",
+                default_params={}
+            )
+            session.add(default_strategy)
+            await session.flush()
+        
+        # Check if config exists
+        config = await session.scalar(
+            select(MarketConfig).where(
+                MarketConfig.market_id == market.id,
+                MarketConfig.strategy_id == default_strategy.id
+            )
+        )
+        
+        if not config:
+            config = MarketConfig(
+                market=market,
+                strategy=default_strategy,
+                is_active=False,
+                tick_size=request.tick_size or 0.01,
+                trade_size=request.trade_size or 1.0,
+                min_size=request.min_size,
+                max_spread=request.max_spread,
+                params={}
+            )
+            session.add(config)
+            await session.commit()
+    
+    summary = await _summarize_market(market)
+    return summary
 

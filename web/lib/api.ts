@@ -101,12 +101,37 @@ export type PolymarketMarket = {
   max_spread?: number | null;
 };
 
-export async function fetchCurrentPolymarketMarkets(limit: number = 100): Promise<PolymarketMarket[]> {
-  const res = await fetch(`${API_BASE}/markets/current?limit=${limit}`, {
-    next: { revalidate: 0 } // Always fetch fresh data
+export async function addMarketToDatabase(market: {
+  question: string;
+  condition_id: string;
+  token_yes: string;
+  token_no: string;
+  neg_risk?: boolean;
+  tick_size?: number;
+  trade_size?: number;
+  min_size?: number;
+  max_spread?: number;
+  metadata?: Record<string, any>;
+}): Promise<Market> {
+  const res = await fetch(`${API_BASE}/markets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: market.question,
+      condition_id: market.condition_id,
+      token_yes: market.token_yes,
+      token_no: market.token_no,
+      neg_risk: market.neg_risk || false,
+      tick_size: market.tick_size,
+      trade_size: market.trade_size,
+      min_size: market.min_size,
+      max_spread: market.max_spread,
+      metadata: market.metadata || {},
+    }),
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch current markets: ${res.status}`);
+    const error = await res.json().catch(() => ({ detail: "Failed to add market" }));
+    throw new Error(error.detail || "Failed to add market");
   }
   return res.json();
 }
