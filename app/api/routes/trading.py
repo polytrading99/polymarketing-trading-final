@@ -91,7 +91,7 @@ async def get_trading_status() -> Dict[str, Any]:
                     "token2": str(row.get("token2", "")),
                 }
                 for _, row in global_state.df.iterrows()
-            ] if not global_state.df.empty else [],
+            ] if hasattr(global_state, 'df') and global_state.df is not None and not global_state.df.empty else [],
             "websocket_connected": len(global_state.all_tokens) > 0,
             "all_tokens": global_state.all_tokens,
         }
