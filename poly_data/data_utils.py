@@ -203,29 +203,114 @@ def fetch_markets_from_polymarket():
         return pd.DataFrame(), {}
 
 
+def sync_markets_from_database():
+    """
+    Sync active markets from database to bot's trading list.
+    This allows markets activated in the UI to be traded by the bot.
+    """
+    try:
+        import asyncio
+        import sys
+        from pathlib import Path
+        
+        # Add project root to path
+        PROJECT_ROOT = Path(__file__).parent.parent
+        if str(PROJECT_ROOT) not in sys.path:
+            sys.path.insert(0, str(PROJECT_ROOT))
+        
+        async def _load_active_markets():
+            from app.config import ConfigRepository
+            from app.database.session import get_session
+            from app.database.models import MarketConfig
+            
+            repository = ConfigRepository()
+            markets = await repository.list_markets(active_only=True)
+            
+            # Get market configs with their parameters
+            async with get_session() as session:
+                from sqlalchemy import select
+                
+                market_data = []
+                for market in markets:
+                    # Get active config for this market
+                    config_stmt = select(MarketConfig).where(
+                        MarketConfig.market_id == market.id,
+                        MarketConfig.is_active == True
+                    )
+                    config = await session.scalar(config_stmt)
+                    
+                    if config:
+                        market_data.append({
+                            'question': market.question,
+                            'condition_id': market.condition_id,
+                            'token1': market.token_yes,
+                            'token2': market.token_no,
+                            'neg_risk': market.neg_risk,
+                            'tick_size': float(config.tick_size) if config.tick_size else 0.01,
+                            'min_size': float(config.min_size) if config.min_size else 0,
+                            'max_size': float(config.max_size) if config.max_size else None,
+                            'max_spread': float(config.max_spread) if config.max_spread else 5.0,
+                            'trade_size': float(config.trade_size) if config.trade_size else 1.0,
+                        })
+                
+                return pd.DataFrame(market_data) if market_data else pd.DataFrame()
+        
+        # Run async function
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        if loop.is_running():
+            # If loop is already running, we need to use a different approach
+            # For now, return empty DataFrame - will be handled by fallback
+            return pd.DataFrame()
+        else:
+            db_df = loop.run_until_complete(_load_active_markets())
+            return db_df
+            
+    except Exception as e:
+        print(f"Error syncing markets from database: {e}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
+
+
 def update_markets():
     """
-    Update market data from Polymarket API (every hour).
-    Falls back to Google Sheets if API fetch fails.
+    Update market data from database (active markets) and Polymarket API.
+    Database markets take priority - if there are active markets in DB, use those.
+    Falls back to Polymarket API if no active DB markets.
     """
-    # Try fetching from Polymarket API first
-    received_df, received_params = fetch_markets_from_polymarket()
+    # First, try to sync active markets from database
+    db_df = sync_markets_from_database()
     
-    # Fallback to Google Sheets if API fetch failed or returned empty
-    if len(received_df) == 0:
-        print("Falling back to Google Sheets for market data...")
-        try:
-            received_df, received_params = get_sheet_df()
-        except Exception as e:
-            print(f"Error fetching from Google Sheets: {e}")
-            received_params = {}
-
-    if len(received_df) > 0:
-        global_state.df, global_state.params = received_df.copy(), received_params
+    if len(db_df) > 0:
+        print(f"Loaded {len(db_df)} active markets from database")
+        # Use database markets
+        global_state.df = db_df.copy()
+        global_state.params = {}  # No params from database for now
     else:
-        print("Warning: No market data available")
-        return
+        # Fallback to Polymarket API or Google Sheets
+        received_df, received_params = fetch_markets_from_polymarket()
+        
+        # Fallback to Google Sheets if API fetch failed or returned empty
+        if len(received_df) == 0:
+            print("Falling back to Google Sheets for market data...")
+            try:
+                received_df, received_params = get_sheet_df()
+            except Exception as e:
+                print(f"Error fetching from Google Sheets: {e}")
+                received_params = {}
 
+        if len(received_df) > 0:
+            global_state.df, global_state.params = received_df.copy(), received_params
+        else:
+            print("Warning: No market data available")
+            return
+
+    # Process markets to set up tokens and reverse mappings
     for _, row in global_state.df.iterrows():
         for col in ['token1', 'token2']:
             row[col] = str(row[col])
