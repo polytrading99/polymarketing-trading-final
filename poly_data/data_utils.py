@@ -361,6 +361,20 @@ def update_markets():
         else:
             print("Warning: No market data available")
             return
+    
+    # Ensure all required columns exist with defaults (for any source)
+    required_cols = {
+        'trade_size': 1.0,
+        'best_bid': 0.5,  # Default mid price
+        'best_ask': 0.5,  # Default mid price
+        '3_hour': 0.0,  # Default volatility
+        'param_type': 'default',
+        'answer1': 'YES',
+        'answer2': 'NO',
+    }
+    for col, default_val in required_cols.items():
+        if col not in global_state.df.columns:
+            global_state.df[col] = default_val
 
     # Process markets to set up tokens and reverse mappings
     for _, row in global_state.df.iterrows():
