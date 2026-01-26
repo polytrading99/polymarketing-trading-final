@@ -87,6 +87,16 @@ export async function updateMarketStatus(
   }
 }
 
+export async function fetchCurrentPolymarketMarkets(limit: number = 100): Promise<PolymarketMarket[]> {
+  const res = await fetch(`${API_BASE}/markets/current?limit=${limit}`, {
+    next: { revalidate: 0 } // Always fetch fresh data
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch current markets: ${res.status}`);
+  }
+  return res.json();
+}
+
 export type PolymarketMarket = {
   question: string;
   condition_id: string;
