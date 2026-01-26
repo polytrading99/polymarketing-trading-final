@@ -45,27 +45,14 @@ def get_account_balance() -> Dict[str, Any]:
     try:
         client = get_polymarket_client()
         
-        # Get balance using the client
-        balance_info = client.get_balance()
+        # Use the correct method name: get_usdc_balance()
+        usdc_balance = client.get_usdc_balance()
         
-        if balance_info and isinstance(balance_info, dict):
-            usdc_balance = balance_info.get("USDC", 0)
-            if isinstance(usdc_balance, (int, float)):
-                return {
-                    "success": True,
-                    "balance": {
-                        "usdc": float(usdc_balance),
-                        "currency": "USDC"
-                    }
-                }
-        
-        # Fallback: try to get balance from client's balance attribute
-        if hasattr(client, 'balance') and client.balance:
-            usdc_balance = client.balance.get("USDC", 0)
+        if isinstance(usdc_balance, (int, float)):
             return {
                 "success": True,
                 "balance": {
-                    "usdc": float(usdc_balance) if usdc_balance else 0.0,
+                    "usdc": float(usdc_balance),
                     "currency": "USDC"
                 }
             }
@@ -95,20 +82,17 @@ def get_account_positions() -> Dict[str, Any]:
     try:
         client = get_polymarket_client()
         
-        # Try to get positions from client
-        positions = []
+        # Use get_all_positions() which returns a DataFrame
+        positions_df = client.get_all_positions()
         
-        # Check if client has a method to get positions
-        if hasattr(client, 'get_positions'):
-            positions = client.get_positions()
-        elif hasattr(client, 'positions'):
-            positions = client.positions or []
-        
-        if not positions:
+        # Convert DataFrame to list of dicts
+        if positions_df is not None and not positions_df.empty:
+            positions = positions_df.to_dict('records')
+            # Calculate total value
+            total_value = sum(float(pos.get("size", 0) or 0) * float(pos.get("avgPrice", 0) or 0) for pos in positions)
+        else:
             positions = []
-        
-        # Calculate total value
-        total_value = sum(float(pos.get("size", 0) or 0) * float(pos.get("avgPrice", 0) or 0) for pos in positions)
+            total_value = 0.0
         
         return {
             "success": True,
@@ -132,20 +116,13 @@ def get_open_orders() -> Dict[str, Any]:
     try:
         client = get_polymarket_client()
         
-        # Try to get open orders from client
-        orders = []
+        # Use get_all_orders() which returns a DataFrame
+        orders_df = client.get_all_orders()
         
-        # Check if client has a method to get orders
-        if hasattr(client, 'get_open_orders'):
-            orders = client.get_open_orders()
-        elif hasattr(client, 'get_orders'):
-            all_orders = client.get_orders()
-            # Filter for open orders
-            orders = [o for o in all_orders if o.get("status") == "open" or o.get("open") is True]
-        elif hasattr(client, 'orders'):
-            orders = [o for o in (client.orders or []) if o.get("status") == "open" or o.get("open") is True]
-        
-        if not orders:
+        # Convert DataFrame to list of dicts
+        if orders_df is not None and not orders_df.empty:
+            orders = orders_df.to_dict('records')
+        else:
             orders = []
         
         return {
