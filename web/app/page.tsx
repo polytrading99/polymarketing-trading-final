@@ -25,7 +25,7 @@ export default function HomePage() {
     isLoading: liveLoading, 
     mutate: mutateLive 
   } = useSWR<PolymarketMarket[]>(
-    viewMode === "live" ? `/markets/current?min_size_max=${showSmallMarketsOnly ? 10 : undefined}&sort_by=${sortMode}` : null,
+    viewMode === "live" ? `/markets/current?min_size_max=${showSmallMarketsOnly ? 10 : ''}&sort_by=${sortMode}` : null,
     () => fetchCurrentPolymarketMarkets(100, showSmallMarketsOnly ? 10 : undefined, sortMode),
     {
       refreshInterval: viewMode === "live" ? 30_000 : 0 // Refresh every 30s when viewing live
