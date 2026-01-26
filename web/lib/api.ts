@@ -434,6 +434,8 @@ export type TradingStatus = {
   }>;
   websocket_connected?: boolean;
   all_tokens?: string[];
+  df_markets_count?: number;
+  all_data_count?: number;
   error?: string;
 };
 
