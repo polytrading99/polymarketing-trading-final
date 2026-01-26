@@ -83,6 +83,17 @@ async def get_trading_status() -> Dict[str, Any]:
             "total_positions": len(positions),
             "total_orders": sum(1 for o in orders.values() if (o.get("buy", {}).get("size", 0) > 0 or o.get("sell", {}).get("size", 0) > 0)),
             "active_markets": len(market_data),
+            "active_markets_list": [
+                {
+                    "condition_id": row.get("condition_id", ""),
+                    "question": row.get("question", ""),
+                    "token1": str(row.get("token1", "")),
+                    "token2": str(row.get("token2", "")),
+                }
+                for _, row in global_state.df.iterrows()
+            ] if not global_state.df.empty else [],
+            "websocket_connected": len(global_state.all_tokens) > 0,
+            "all_tokens": global_state.all_tokens,
         }
     except ImportError:
         return {
@@ -95,10 +106,45 @@ async def get_trading_status() -> Dict[str, Any]:
             "total_positions": 0,
             "total_orders": 0,
             "active_markets": 0,
+            "active_markets_list": [],
+            "websocket_connected": False,
+            "all_tokens": [],
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get trading status: {str(e)}"
         )
+
+
+@router.post("/sync-markets", summary="Force immediate sync of markets from database")
+async def sync_markets() -> Dict[str, Any]:
+    """Force immediate sync of active markets from database to bot's trading list."""
+    try:
+        import poly_data.global_state as global_state
+        from poly_data.data_utils import update_markets
+        
+        # Force sync markets from database
+        update_markets()
+        
+        return {
+            "success": True,
+            "message": "Markets synced successfully",
+            "active_markets_count": len(global_state.df) if not global_state.df.empty else 0,
+            "active_markets": [
+                {
+                    "condition_id": row.get("condition_id", ""),
+                    "question": row.get("question", ""),
+                }
+                for _, row in global_state.df.iterrows()
+            ] if not global_state.df.empty else [],
+            "all_tokens": global_state.all_tokens,
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
 

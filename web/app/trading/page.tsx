@@ -6,6 +6,7 @@ import { DollarSign, Package, ShoppingCart, Activity, RefreshCw } from "lucide-r
 import {
   getTradingStatus,
   getAccountSummary,
+  syncMarkets,
   type TradingStatus,
   type AccountSummary,
 } from "../../lib/api";
@@ -29,10 +30,29 @@ export default function TradingPage() {
     { refreshInterval: 5000 } // Update every 5 seconds
   );
 
+  const [syncing, setSyncing] = useState(false);
+
   const handleRefresh = () => {
     mutateTrading();
     mutateAccount();
     setLastUpdate(new Date());
+  };
+
+  const handleSyncMarkets = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncMarkets();
+      if (result.success) {
+        alert(`Markets synced! ${result.active_markets_count} active markets loaded.`);
+        handleRefresh();
+      } else {
+        alert(`Failed to sync markets: ${result.error}`);
+      }
+    } catch (err) {
+      alert(`Error syncing markets: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // Calculate totals
@@ -64,13 +84,32 @@ export default function TradingPage() {
             Real-time account balance and trading status
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSyncMarkets}
+            disabled={syncing}
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-900/20 px-4 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Activity className="h-4 w-4" />
+                Sync Markets
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* Account Balance Table */}
@@ -118,6 +157,62 @@ export default function TradingPage() {
           </table>
         </div>
       </div>
+
+      {/* Bot Status */}
+      {tradingStatus && (
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Bot Status
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="p-4 rounded-md bg-slate-800/50">
+              <div className="text-xs text-slate-500 mb-1">Active Markets</div>
+              <div className="text-2xl font-bold text-blue-400">
+                {tradingStatus.active_markets || 0}
+              </div>
+            </div>
+            <div className="p-4 rounded-md bg-slate-800/50">
+              <div className="text-xs text-slate-500 mb-1">WebSocket</div>
+              <div className={clsx(
+                "text-2xl font-bold",
+                tradingStatus.websocket_connected ? "text-emerald-400" : "text-red-400"
+              )}>
+                {tradingStatus.websocket_connected ? "✓ Connected" : "✗ Disconnected"}
+              </div>
+            </div>
+            <div className="p-4 rounded-md bg-slate-800/50">
+              <div className="text-xs text-slate-500 mb-1">Bot Positions</div>
+              <div className="text-2xl font-bold text-yellow-400">
+                {tradingStatus.total_positions || 0}
+              </div>
+            </div>
+            <div className="p-4 rounded-md bg-slate-800/50">
+              <div className="text-xs text-slate-500 mb-1">Bot Orders</div>
+              <div className="text-2xl font-bold text-purple-400">
+                {tradingStatus.total_orders || 0}
+              </div>
+            </div>
+          </div>
+          {tradingStatus.active_markets_list && tradingStatus.active_markets_list.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm font-semibold text-slate-300 mb-2">Active Markets:</div>
+              <div className="space-y-1">
+                {tradingStatus.active_markets_list.map((market: any, idx: number) => (
+                  <div key={idx} className="text-xs text-slate-400 font-mono">
+                    • {market.question || market.condition_id}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {tradingStatus.error && (
+            <div className="mt-4 p-3 rounded-md bg-red-500/10 border border-red-500/50 text-sm text-red-300">
+              {tradingStatus.error}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Trading Status Table */}
       {tradingStatus?.success && (

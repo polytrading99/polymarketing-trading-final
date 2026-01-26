@@ -437,4 +437,22 @@ export async function getTradingStatus(): Promise<TradingStatus> {
   return res.json();
 }
 
+export async function syncMarkets(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  active_markets_count?: number;
+  active_markets?: Array<{ condition_id: string; question: string }>;
+  all_tokens?: string[];
+}> {
+  const res = await fetch(`${API_BASE}/trading/sync-markets`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Failed to sync markets" }));
+    throw new Error(error.error || "Failed to sync markets");
+  }
+  return res.json();
+}
+
 
