@@ -224,12 +224,18 @@ def sync_markets_from_database():
             sys.path.insert(0, str(PROJECT_ROOT))
         
         async def _load_active_markets():
-            from app.config import ConfigRepository
-            from app.database.session import get_session
-            from app.database.models import MarketConfig
-            
-            repository = ConfigRepository()
-            markets = await repository.list_markets(active_only=True)
+            try:
+                from app.config import ConfigRepository
+                from app.database.session import get_session
+                from app.database.models import MarketConfig
+                
+                repository = ConfigRepository()
+                markets = await repository.list_markets(active_only=True)
+            except Exception as e:
+                print(f"Error loading markets from database: {e}")
+                import traceback
+                traceback.print_exc()
+                return pd.DataFrame()
             
             # Get market configs with their parameters
             async with get_session() as session:
@@ -303,6 +309,17 @@ def update_markets():
         print(f"Loaded {len(db_df)} active markets from database")
         # Use database markets
         global_state.df = db_df.copy()
+        
+        # Ensure all required columns exist with defaults
+        required_cols = {
+            'trade_size': 1.0,
+            'best_bid': 0.5,  # Default mid price
+            'best_ask': 0.5,  # Default mid price
+            '3_hour': 0.0,  # Default volatility
+        }
+        for col, default_val in required_cols.items():
+            if col not in global_state.df.columns:
+                global_state.df[col] = default_val
         
         # Initialize default parameters if not already set
         if not global_state.params:
