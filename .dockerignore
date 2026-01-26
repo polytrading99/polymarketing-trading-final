@@ -19,4 +19,9 @@ docker-compose.override.yml
 .gitignore
 .cursor/
 *.log
+logs/
+**/logs/
+polymarket_mm_deliver/
+**/mm_main.log
+**/trade.log
 

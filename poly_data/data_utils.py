@@ -175,7 +175,8 @@ def fetch_markets_from_polymarket():
             return pd.DataFrame(), {}
         
         # Convert to DataFrame and format
-        empty_sel_df = pd.DataFrame()  # Empty selection - use all markets
+        # Create empty selection DataFrame with required 'question' column to avoid KeyError
+        empty_sel_df = pd.DataFrame(columns=['question'])  # Empty selection - use all markets
         all_data, markets_df = get_markets(all_results, empty_sel_df, maker_reward=0.75)
         
         # Format columns to match expected structure
@@ -207,11 +208,15 @@ def sync_markets_from_database():
     """
     Sync active markets from database to bot's trading list.
     This allows markets activated in the UI to be traded by the bot.
+    
+    Note: This function must be called from a synchronous context.
+    It uses a thread pool to run async code to avoid event loop conflicts.
     """
     try:
         import asyncio
         import sys
         from pathlib import Path
+        from concurrent.futures import ThreadPoolExecutor
         
         # Add project root to path
         PROJECT_ROOT = Path(__file__).parent.parent
@@ -255,17 +260,20 @@ def sync_markets_from_database():
                 
                 return pd.DataFrame(market_data) if market_data else pd.DataFrame()
         
-        # Run async function in a new event loop
-        try:
-            return asyncio.run(_load_active_markets())
-        except RuntimeError:
-            # If there's already a running loop, create a new one
+        # Use ThreadPoolExecutor to run async code in a separate thread
+        # This avoids event loop conflicts when called from an async context
+        def run_in_thread():
+            # Create a new event loop in this thread
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 return loop.run_until_complete(_load_active_markets())
             finally:
                 loop.close()
+        
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_in_thread)
+            return future.result(timeout=30)  # 30 second timeout
             
     except Exception as e:
         print(f"Error syncing markets from database: {e}")
