@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { ArrowRightCircle, Loader2, RefreshCcw, Play, Square, Database, Globe, Plus } from "lucide-react";
+import { ArrowRightCircle, Loader2, RefreshCcw, Play, Square, Database, Globe, Plus, Filter } from "lucide-react";
 import { fetchMarkets, fetchCurrentPolymarketMarkets, startBot, stopBot, updateMarketStatus, addMarketToDatabase, type Market, type PolymarketMarket } from "../lib/api";
 import { useCallback, useState } from "react";
 import clsx from "clsx";
@@ -10,9 +10,12 @@ import { DashboardStats, PnLChart } from "./dashboard";
 const fetcher = () => fetchMarkets();
 
 type ViewMode = "database" | "live";
+type SortMode = "rewards" | "min_size" | "min_size_desc";
 
 export default function HomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("database");
+  const [sortMode, setSortMode] = useState<SortMode>("min_size"); // Default to sorting by min_size (smallest first)
+  const [showSmallMarketsOnly, setShowSmallMarketsOnly] = useState(true); // Default to showing only small markets
   const { data, error, isLoading, mutate } = useSWR<Market[]>("/markets", fetcher, {
     refreshInterval: 10_000
   });
@@ -22,8 +25,8 @@ export default function HomePage() {
     isLoading: liveLoading, 
     mutate: mutateLive 
   } = useSWR<PolymarketMarket[]>(
-    viewMode === "live" ? "/markets/current" : null,
-    () => fetchCurrentPolymarketMarkets(100),
+    viewMode === "live" ? `/markets/current?min_size_max=${showSmallMarketsOnly ? 10 : undefined}&sort_by=${sortMode}` : null,
+    () => fetchCurrentPolymarketMarkets(100, showSmallMarketsOnly ? 10 : undefined, sortMode),
     {
       refreshInterval: viewMode === "live" ? 30_000 : 0 // Refresh every 30s when viewing live
     }
@@ -149,6 +152,38 @@ export default function HomePage() {
             <RefreshCcw className="h-4 w-4" />
             Refresh
           </button>
+          {viewMode === "live" && (
+            <>
+              <button
+                onClick={() => {
+                  setShowSmallMarketsOnly(!showSmallMarketsOnly);
+                  mutateLive();
+                }}
+                className={clsx(
+                  "inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors",
+                  showSmallMarketsOnly
+                    ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                    : "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+                )}
+                title="Show only markets with min_size ≤ $10"
+              >
+                <Filter className="h-4 w-4" />
+                Small Markets Only
+              </button>
+              <select
+                value={sortMode}
+                onChange={(e) => {
+                  setSortMode(e.target.value as SortMode);
+                  mutateLive();
+                }}
+                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="min_size">Sort: Smallest Min Size First</option>
+                <option value="min_size_desc">Sort: Largest Min Size First</option>
+                <option value="rewards">Sort: Highest Rewards First</option>
+              </select>
+            </>
+          )}
         </div>
       </header>
 
@@ -337,7 +372,7 @@ export default function HomePage() {
             {liveMarkets && liveMarkets.length > 0 && (
               <>
                 <div className="mb-4 rounded-md border border-blue-500/50 bg-blue-500/10 px-4 py-3 text-sm text-blue-200">
-                  Showing {liveMarkets.length} currently open markets from Polymarket (refreshes every 30 seconds)
+                  Showing {liveMarkets.length} {showSmallMarketsOnly ? "small " : ""}markets from Polymarket (min_size ≤ $10) - {sortMode === "min_size" ? "sorted by smallest min_size first" : sortMode === "rewards" ? "sorted by highest rewards" : "sorted by largest min_size first"}
                 </div>
                 <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {liveMarkets.map((market, idx) => (
@@ -427,8 +462,12 @@ export default function HomePage() {
                               {market.min_size !== null && market.min_size !== undefined && (
                                 <div>
                                   <span className="text-xs text-slate-500">Min Size</span>
-                                  <p className="text-sm font-medium text-slate-400">
-                                    {market.min_size} USDC
+                                  <p className={clsx(
+                                    "text-sm font-medium",
+                                    market.min_size <= 10 ? "text-emerald-400 font-semibold" : "text-slate-400"
+                                  )}>
+                                    ${market.min_size} USDC
+                                    {market.min_size <= 10 && <span className="ml-1 text-xs">✓ Good for $10</span>}
                                   </p>
                                 </div>
                               )}

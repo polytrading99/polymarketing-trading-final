@@ -87,8 +87,22 @@ export async function updateMarketStatus(
   }
 }
 
-export async function fetchCurrentPolymarketMarkets(limit: number = 100): Promise<PolymarketMarket[]> {
-  const res = await fetch(`${API_BASE}/markets/current?limit=${limit}`, {
+export async function fetchCurrentPolymarketMarkets(
+  limit: number = 100,
+  minSizeMax?: number,
+  sortBy: "rewards" | "min_size" | "min_size_desc" = "rewards"
+): Promise<PolymarketMarket[]> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+  });
+  if (minSizeMax !== undefined) {
+    params.append("min_size_max", minSizeMax.toString());
+  }
+  if (sortBy) {
+    params.append("sort_by", sortBy);
+  }
+  
+  const res = await fetch(`${API_BASE}/markets/current?${params.toString()}`, {
     next: { revalidate: 0 } // Always fetch fresh data
   });
   if (!res.ok) {

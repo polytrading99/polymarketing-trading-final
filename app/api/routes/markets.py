@@ -160,7 +160,9 @@ class AddMarketRequest(BaseModel):
 
 @router.get("/current", response_model=list[PolymarketMarketInfo], summary="Fetch current open markets from Polymarket")
 async def fetch_current_polymarket_markets(
-    limit: Optional[int] = Query(default=100, description="Maximum number of markets to fetch")
+    limit: Optional[int] = Query(default=100, description="Maximum number of markets to fetch"),
+    min_size_max: Optional[float] = Query(default=None, description="Filter markets with min_size less than this value (for small balance testing)"),
+    sort_by: Optional[str] = Query(default="rewards", description="Sort by: 'rewards', 'min_size' (ascending), 'min_size_desc' (descending)")
 ) -> list[PolymarketMarketInfo]:
     """
     Fetch currently open/active markets directly from Polymarket API.
@@ -168,7 +170,7 @@ async def fetch_current_polymarket_markets(
     This endpoint connects to Polymarket's API and fetches all currently active markets.
     Useful for discovering new markets or checking what's available on Polymarket.
     """
-    def _fetch_markets_sync(limit: int):
+    def _fetch_markets_sync(limit: int, min_size_max: Optional[float], sort_by: Optional[str]):
         """Synchronous function to fetch markets (runs in thread pool)."""
         try:
             from py_clob_client.client import ClobClient
@@ -204,7 +206,10 @@ async def fetch_current_polymarket_markets(
             all_markets = []
             count = 0
             
-            while count < limit:
+            # Fetch more markets if filtering by min_size (we'll filter later)
+            fetch_limit = limit * 3 if min_size_max else limit
+            
+            while count < fetch_limit:
                 try:
                     markets = client.get_sampling_markets(next_cursor=cursor)
                     
@@ -220,10 +225,6 @@ async def fetch_current_polymarket_markets(
                         
                 except Exception as e:
                     break
-            
-            # Limit results
-            if len(all_markets) > limit:
-                all_markets = all_markets[:limit]
             
             # Convert to response format
             result = []
@@ -267,6 +268,22 @@ async def fetch_current_polymarket_markets(
                     max_spread=max_spread,
                 ))
             
+            # Filter by min_size if specified
+            if min_size_max is not None:
+                result = [m for m in result if m.min_size is not None and m.min_size <= min_size_max]
+            
+            # Sort results
+            if sort_by == "min_size":
+                result.sort(key=lambda x: (x.min_size if x.min_size is not None else float('inf'), 0))
+            elif sort_by == "min_size_desc":
+                result.sort(key=lambda x: (x.min_size if x.min_size is not None else 0, 0), reverse=True)
+            elif sort_by == "rewards":
+                result.sort(key=lambda x: (x.rewards_daily_rate if x.rewards_daily_rate is not None else 0, 0), reverse=True)
+            
+            # Limit results
+            if len(result) > limit:
+                result = result[:limit]
+            
             return result
             
         except Exception as e:
@@ -277,7 +294,7 @@ async def fetch_current_polymarket_markets(
     
     # Run the synchronous function in a thread pool
     loop = asyncio.get_event_loop()
-    markets = await loop.run_in_executor(None, _fetch_markets_sync, limit)
+    markets = await loop.run_in_executor(None, _fetch_markets_sync, limit, min_size_max, sort_by)
     
     return markets
 
