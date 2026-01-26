@@ -1,4 +1,23 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Auto-detect API URL based on current host
+const getApiBase = () => {
+  // If NEXT_PUBLIC_API_URL is set, use it
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // If running in browser, use the same host/port as the current page
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    // Use port 8000 for API (backend)
+    return `${protocol}//${hostname}:8000`;
+  }
+  
+  // Fallback for server-side rendering
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+};
+
+const API_BASE = getApiBase();
 
 export type Market = {
   id: string;
@@ -304,18 +323,34 @@ export async function updateCredentials(
   proxyAddress: string,
   signatureType: number = 2
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/mm-bot/credentials`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      private_key: privateKey,
-      proxy_address: proxyAddress,
-      signature_type: signatureType,
-    }),
-  });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Failed to update credentials" }));
-    throw new Error(error.detail || "Failed to update credentials");
+  try {
+    const res = await fetch(`${API_BASE}/mm-bot/credentials`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        private_key: privateKey,
+        proxy_address: proxyAddress,
+        signature_type: signatureType,
+      }),
+    });
+    
+    if (!res.ok) {
+      let errorMessage = "Failed to update credentials";
+      try {
+        const error = await res.json();
+        errorMessage = error.detail || error.message || errorMessage;
+      } catch {
+        // If response is not JSON, use status text
+        errorMessage = `HTTP ${res.status}: ${res.statusText || "Failed to update credentials"}`;
+      }
+      throw new Error(errorMessage);
+    }
+  } catch (err) {
+    // Handle network errors
+    if (err instanceof TypeError && err.message === "Failed to fetch") {
+      throw new Error(`Network error: Cannot connect to API server at ${API_BASE}. Please check if the backend is running.`);
+    }
+    throw err;
   }
 }
 

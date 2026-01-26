@@ -64,7 +64,9 @@ export default function SettingsPage() {
       setPrivateKey(""); // Clear private key for security
       await mutateCredentials();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update credentials");
+      const errorMessage = err instanceof Error ? err.message : "Failed to update credentials";
+      console.error("Error updating credentials:", err);
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
