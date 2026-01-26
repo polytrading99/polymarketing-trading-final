@@ -255,20 +255,17 @@ def sync_markets_from_database():
                 
                 return pd.DataFrame(market_data) if market_data else pd.DataFrame()
         
-        # Run async function
+        # Run async function in a new event loop
         try:
-            loop = asyncio.get_event_loop()
+            return asyncio.run(_load_active_markets())
         except RuntimeError:
+            # If there's already a running loop, create a new one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        
-        if loop.is_running():
-            # If loop is already running, we need to use a different approach
-            # For now, return empty DataFrame - will be handled by fallback
-            return pd.DataFrame()
-        else:
-            db_df = loop.run_until_complete(_load_active_markets())
-            return db_df
+            try:
+                return loop.run_until_complete(_load_active_markets())
+            finally:
+                loop.close()
             
     except Exception as e:
         print(f"Error syncing markets from database: {e}")
