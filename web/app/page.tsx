@@ -79,14 +79,6 @@ export default function HomePage() {
     }
   }, [addingMarkets, mutate]);
 
-  const onRefresh = useCallback(() => {
-    if (viewMode === "database") {
-      mutate();
-    } else {
-      mutateLive();
-    }
-  }, [mutate, mutateLive, viewMode]);
-
   const handleToggleMarket = useCallback(async (market: Market) => {
     if (loadingMarkets.has(market.id)) return;
     
