@@ -65,9 +65,10 @@ def update_periodically():
             update_positions(avgOnly=True)  # Only update average price, not position size
             update_orders()
 
-            # Update market data every hour (720 cycles of 5 seconds = 3600 seconds)
-            if i % 720 == 0:
-                print(f"Updating markets from Polymarket API (hourly update)...")
+            # Update market data every 10 minutes (120 cycles of 5 seconds = 600 seconds)
+            # This allows newly activated markets to be picked up faster
+            if i % 120 == 0:
+                print(f"Updating markets from database (every 10 minutes)...")
                 update_markets()
                 i = 1
                     

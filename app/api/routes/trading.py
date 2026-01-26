@@ -111,34 +111,46 @@ async def get_trading_status() -> Dict[str, Any]:
             "all_tokens": [],
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get trading status: {str(e)}"
-        )
+        import traceback
+        # Return error response instead of raising exception to avoid 500
+        return {
+            "success": False,
+            "error": f"Failed to get trading status: {str(e)}",
+            "traceback": traceback.format_exc(),
+            "positions": {},
+            "orders": {},
+            "performing_trades": {},
+            "market_data": {},
+            "total_positions": 0,
+            "total_orders": 0,
+            "active_markets": 0,
+            "active_markets_list": [],
+            "websocket_connected": False,
+            "all_tokens": [],
+        }
 
 
-@router.post("/sync-markets", summary="Force immediate sync of markets from database")
+@router.post("/sync-markets", summary="Signal worker to sync markets (worker checks every 10 minutes)")
 async def sync_markets() -> Dict[str, Any]:
-    """Force immediate sync of active markets from database to bot's trading list."""
+    """
+    Signal the worker to sync markets from database.
+    
+    Note: The worker runs in a separate container and syncs markets every 10 minutes.
+    This endpoint creates a sync flag file that the worker checks.
+    For immediate sync, restart the worker: docker-compose restart worker
+    """
     try:
-        import poly_data.global_state as global_state
-        from poly_data.data_utils import update_markets
+        import os
+        from pathlib import Path
         
-        # Force sync markets from database
-        update_markets()
+        # Create a sync flag file that the worker can check
+        sync_flag_path = Path("/app/.sync_markets_flag")
+        sync_flag_path.touch()
         
         return {
             "success": True,
-            "message": "Markets synced successfully",
-            "active_markets_count": len(global_state.df) if not global_state.df.empty else 0,
-            "active_markets": [
-                {
-                    "condition_id": row.get("condition_id", ""),
-                    "question": row.get("question", ""),
-                }
-                for _, row in global_state.df.iterrows()
-            ] if not global_state.df.empty else [],
-            "all_tokens": global_state.all_tokens,
+            "message": "Sync signal sent. Worker will sync markets within 10 minutes. For immediate sync, restart worker: docker-compose restart worker",
+            "note": "Worker runs in separate container and syncs every 10 minutes automatically",
         }
     except Exception as e:
         import traceback
