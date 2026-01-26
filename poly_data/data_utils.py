@@ -245,6 +245,11 @@ def sync_markets_from_database():
                     config = await session.scalar(config_stmt)
                     
                     if config:
+                        # Get strategy name for param_type, default to "default"
+                        param_type = "default"
+                        if config.strategy:
+                            param_type = config.strategy.name
+                        
                         market_data.append({
                             'question': market.question,
                             'condition_id': market.condition_id,
@@ -256,6 +261,9 @@ def sync_markets_from_database():
                             'max_size': float(config.max_size) if config.max_size else None,
                             'max_spread': float(config.max_spread) if config.max_spread else 5.0,
                             'trade_size': float(config.trade_size) if config.trade_size else 1.0,
+                            'param_type': param_type,
+                            'answer1': 'YES',  # Default answers
+                            'answer2': 'NO',
                         })
                 
                 return pd.DataFrame(market_data) if market_data else pd.DataFrame()
