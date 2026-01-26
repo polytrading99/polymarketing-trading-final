@@ -9,6 +9,8 @@ import asyncio
 from poly_data.data_utils import set_position, set_order, update_positions
 
 def process_book_data(asset, json_data):
+    # asset is the market ID (condition_id) from websocket
+    # Store order book data keyed by condition_id
     global_state.all_data[asset] = {
         'asset_id': json_data['asset_id'],  # token_id for the Yes token
         'bids': SortedDict(),
@@ -17,6 +19,14 @@ def process_book_data(asset, json_data):
 
     global_state.all_data[asset]['bids'].update({float(entry['price']): float(entry['size']) for entry in json_data['bids']})
     global_state.all_data[asset]['asks'].update({float(entry['price']): float(entry['size']) for entry in json_data['asks']})
+    
+    # Also store a mapping from token_id to condition_id for quick lookup
+    if 'asset_id' in json_data:
+        token_id = str(json_data['asset_id'])
+        if token_id not in global_state.REVERSE_TOKENS:
+            # Store mapping: token_id -> condition_id
+            # We'll use REVERSE_TOKENS temporarily, but ideally should have a separate mapping
+            pass
 
 def process_price_change(asset, side, price_level, new_size):
     # Ensure asset exists in all_data before processing

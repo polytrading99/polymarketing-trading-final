@@ -149,9 +149,14 @@ async def perform_trade(market_or_token):
                 (global_state.df['token2'] == str(market_or_token))
             ]
         
+        # If still not found, try using TOKEN_TO_CONDITION_ID mapping
+        if len(market_df) == 0 and str(market_or_token) in global_state.TOKEN_TO_CONDITION_ID:
+            condition_id = global_state.TOKEN_TO_CONDITION_ID[str(market_or_token)]
+            market_df = global_state.df[global_state.df['condition_id'] == condition_id]
+        
         # If still not found, skip
         if len(market_df) == 0:
-            print(f"Market not found for {market_or_token} in active markets. Skipping trade.")
+            print(f"Market not found for {market_or_token} in active markets. Available tokens: {list(global_state.TOKEN_TO_CONDITION_ID.keys())[:5]}...")
             return
         
         # Get the condition_id for this market

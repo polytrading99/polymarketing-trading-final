@@ -9,6 +9,9 @@ all_tokens = []
 # Mapping between tokens in the same market (YES->NO, NO->YES)
 REVERSE_TOKENS = {}  
 
+# Mapping from token_id to condition_id for quick lookup
+TOKEN_TO_CONDITION_ID = {}  
+
 # Order book data for all markets
 all_data = {}  
 

@@ -435,6 +435,11 @@ def update_markets():
 
                 if token2 not in global_state.REVERSE_TOKENS:
                     global_state.REVERSE_TOKENS[token2] = token1
+                
+                # Store mapping from token to condition_id
+                condition_id = str(global_state.df.at[idx, 'condition_id'])
+                global_state.TOKEN_TO_CONDITION_ID[token1] = condition_id
+                global_state.TOKEN_TO_CONDITION_ID[token2] = condition_id
 
                 for col2 in [f"{token1}_buy", f"{token1}_sell", f"{token2}_buy", f"{token2}_sell"]:
                     if col2 not in global_state.performing:
