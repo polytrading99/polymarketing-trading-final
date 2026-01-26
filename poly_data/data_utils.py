@@ -251,7 +251,7 @@ def sync_markets_from_database():
                     markets = markets_result.scalars().all()
                     
                     for market in markets:
-                        # Get active config for this market
+                        # Try to get active config first, then any config, then use defaults
                         config_stmt = select(MarketConfig).where(
                             MarketConfig.market_id == market.id,
                             MarketConfig.is_active == True
@@ -259,31 +259,39 @@ def sync_markets_from_database():
                         config_result = await session.execute(config_stmt)
                         config = config_result.scalar_one_or_none()
                         
-                        if config:
-                            # Get strategy name for param_type, default to "default"
-                            param_type = "default"
-                            if config.strategy_id:
-                                strategy_stmt = select(Strategy).where(Strategy.id == config.strategy_id)
-                                strategy_result = await session.execute(strategy_stmt)
-                                strategy = strategy_result.scalar_one_or_none()
-                                if strategy:
-                                    param_type = strategy.name
-                            
-                            market_data.append({
-                                'question': market.question,
-                                'condition_id': market.condition_id,
-                                'token1': market.token_yes,
-                                'token2': market.token_no,
-                                'neg_risk': market.neg_risk,
-                                'tick_size': float(config.tick_size) if config.tick_size else 0.01,
-                                'min_size': float(config.min_size) if config.min_size else 0,
-                                'max_size': float(config.max_size) if config.max_size else None,
-                                'max_spread': float(config.max_spread) if config.max_spread else 5.0,
-                                'trade_size': float(config.trade_size) if config.trade_size else 1.0,
-                                'param_type': param_type,
-                                'answer1': 'YES',  # Default answers
-                                'answer2': 'NO',
-                            })
+                        # If no active config, try to get any config for this market
+                        if not config:
+                            config_stmt_any = select(MarketConfig).where(
+                                MarketConfig.market_id == market.id
+                            ).limit(1)
+                            config_result_any = await session.execute(config_stmt_any)
+                            config = config_result_any.scalar_one_or_none()
+                        
+                        # Get strategy name for param_type, default to "default"
+                        param_type = "default"
+                        if config and config.strategy_id:
+                            strategy_stmt = select(Strategy).where(Strategy.id == config.strategy_id)
+                            strategy_result = await session.execute(strategy_stmt)
+                            strategy = strategy_result.scalar_one_or_none()
+                            if strategy:
+                                param_type = strategy.name
+                        
+                        # Use config values if available, otherwise use defaults
+                        market_data.append({
+                            'question': market.question,
+                            'condition_id': market.condition_id,
+                            'token1': market.token_yes,
+                            'token2': market.token_no,
+                            'neg_risk': market.neg_risk,
+                            'tick_size': float(config.tick_size) if config and config.tick_size else 0.01,
+                            'min_size': float(config.min_size) if config and config.min_size else 0,
+                            'max_size': float(config.max_size) if config and config.max_size else None,
+                            'max_spread': float(config.max_spread) if config and config.max_spread else 5.0,
+                            'trade_size': float(config.trade_size) if config and config.trade_size else 1.0,
+                            'param_type': param_type,
+                            'answer1': 'YES',  # Default answers
+                            'answer2': 'NO',
+                        })
                 
                 await engine.dispose()
                 return pd.DataFrame(market_data) if market_data else pd.DataFrame()
