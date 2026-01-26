@@ -158,9 +158,12 @@ async def perform_trade(market):
             params = global_state.params.get(param_type, global_state.params.get('default', {}))
             
             # Create a list with both outcomes for the market
+            # Handle missing answer1/answer2 columns (default to YES/NO)
+            answer1 = row.get('answer1', 'YES')
+            answer2 = row.get('answer2', 'NO')
             deets = [
-                {'name': 'token1', 'token': row['token1'], 'answer': row['answer1']}, 
-                {'name': 'token2', 'token': row['token2'], 'answer': row['answer2']}
+                {'name': 'token1', 'token': row['token1'], 'answer': answer1}, 
+                {'name': 'token2', 'token': row['token2'], 'answer': answer2}
             ]
             print(f"\n\n{pd.Timestamp.utcnow().tz_localize(None)}: {row['question']}")
 
