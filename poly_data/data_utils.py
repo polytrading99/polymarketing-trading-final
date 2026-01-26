@@ -1,7 +1,8 @@
 import poly_data.global_state as global_state
 from poly_data.utils import get_sheet_df
 import time
-import poly_data.global_state as global_state
+import pandas as pd
+import traceback
 
 #sth here seems to be removing the position
 def update_positions(avgOnly=False):
@@ -145,12 +146,85 @@ def set_order(token, side, size, price):
 
     
 
+def fetch_markets_from_polymarket():
+    """
+    Fetch markets directly from Polymarket API instead of Google Sheets.
+    Returns DataFrame with market data and empty params dict.
+    """
+    try:
+        if not hasattr(global_state, 'client') or global_state.client is None:
+            print("Warning: PolymarketClient not initialized, cannot fetch markets")
+            return pd.DataFrame(), {}
+        
+        from data_updater.find_markets import get_all_markets, get_all_results, get_markets
+        
+        # Fetch all markets from Polymarket
+        print("Fetching markets from Polymarket API...")
+        all_markets_df = get_all_markets(global_state.client.client)
+        
+        if len(all_markets_df) == 0:
+            print("No markets fetched from Polymarket API")
+            return pd.DataFrame(), {}
+        
+        # Process markets to get order book data
+        print(f"Processing {len(all_markets_df)} markets...")
+        all_results = get_all_results(all_markets_df, global_state.client.client, max_workers=5)
+        
+        if len(all_results) == 0:
+            print("No market results processed")
+            return pd.DataFrame(), {}
+        
+        # Convert to DataFrame and format
+        empty_sel_df = pd.DataFrame()  # Empty selection - use all markets
+        all_data, markets_df = get_markets(all_results, empty_sel_df, maker_reward=0.75)
+        
+        # Format columns to match expected structure
+        if len(markets_df) > 0:
+            # Ensure required columns exist
+            required_cols = ['question', 'token1', 'token2', 'condition_id', 'neg_risk', 'tick_size', 'min_size', 'max_size', 'max_spread']
+            for col in required_cols:
+                if col not in markets_df.columns:
+                    if col == 'neg_risk':
+                        markets_df[col] = False
+                    elif col in ['tick_size', 'min_size', 'max_size', 'max_spread']:
+                        markets_df[col] = 0.01 if col == 'tick_size' else 0
+                    else:
+                        markets_df[col] = ''
+            
+            print(f"Successfully fetched {len(markets_df)} markets from Polymarket API")
+            return markets_df, {}
+        else:
+            print("No markets returned after processing")
+            return pd.DataFrame(), {}
+            
+    except Exception as e:
+        print(f"Error fetching markets from Polymarket API: {e}")
+        print(traceback.format_exc())
+        return pd.DataFrame(), {}
+
+
 def update_markets():
-    received_df, received_params = get_sheet_df()
+    """
+    Update market data from Polymarket API (every hour).
+    Falls back to Google Sheets if API fetch fails.
+    """
+    # Try fetching from Polymarket API first
+    received_df, received_params = fetch_markets_from_polymarket()
+    
+    # Fallback to Google Sheets if API fetch failed or returned empty
+    if len(received_df) == 0:
+        print("Falling back to Google Sheets for market data...")
+        try:
+            received_df, received_params = get_sheet_df()
+        except Exception as e:
+            print(f"Error fetching from Google Sheets: {e}")
+            received_params = {}
 
     if len(received_df) > 0:
         global_state.df, global_state.params = received_df.copy(), received_params
-    
+    else:
+        print("Warning: No market data available")
+        return
 
     for _, row in global_state.df.iterrows():
         for col in ['token1', 'token2']:

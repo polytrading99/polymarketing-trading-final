@@ -17,7 +17,7 @@ def update_once():
     """
     Initialize the application state by fetching market data, positions, and orders.
     """
-    update_markets()    # Get market information from Google Sheets
+    update_markets()    # Get market information from Polymarket API
     update_positions()  # Get current positions from Polymarket
     update_orders()     # Get current orders from Polymarket
 
@@ -50,7 +50,7 @@ def update_periodically():
     """
     Background thread function that periodically updates market data, positions and orders.
     - Positions and orders are updated every 5 seconds
-    - Market data is updated every 30 seconds (every 6 cycles)
+    - Market data is updated every hour (every 720 cycles of 5 seconds = 3600 seconds)
     - Stale pending trades are removed each cycle
     """
     i = 1
@@ -65,8 +65,9 @@ def update_periodically():
             update_positions(avgOnly=True)  # Only update average price, not position size
             update_orders()
 
-            # Update market data every 6th cycle (30 seconds)
-            if i % 6 == 0:
+            # Update market data every hour (720 cycles of 5 seconds = 3600 seconds)
+            if i % 720 == 0:
+                print(f"Updating markets from Polymarket API (hourly update)...")
                 update_markets()
                 i = 1
                     

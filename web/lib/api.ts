@@ -278,6 +278,11 @@ export async function getAccountSummary(): Promise<AccountSummary> {
   return res.json();
 }
 
+// Alias for cleaner API calls
+export async function getAccountSummaryAlt(): Promise<AccountSummary> {
+  return getAccountSummary();
+}
+
 // Credentials API
 export type CredentialsInfo = {
   private_key_masked: string;
