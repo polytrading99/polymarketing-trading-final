@@ -153,9 +153,16 @@ def get_buy_sell_amount(position, bid_price, row, other_token_position=0):
     buy_amount = 0
     sell_amount = 0
 
-    # Get max_size, defaulting to trade_size if not specified
-    max_size = row.get('max_size', row['trade_size'])
-    trade_size = row['trade_size']
+    # Get max_size, defaulting to trade_size if not specified or NaN
+    max_size = row.get('max_size', row.get('trade_size', 1.0))
+    if pd.isna(max_size) or max_size is None or max_size == '':
+        max_size = row.get('trade_size', 1.0)
+    max_size = float(max_size)
+    
+    trade_size = row.get('trade_size', 1.0)
+    if pd.isna(trade_size) or trade_size is None or trade_size == '':
+        trade_size = 1.0
+    trade_size = float(trade_size)
     
     # Calculate total exposure across both sides
     total_exposure = position + other_token_position
@@ -183,14 +190,21 @@ def get_buy_sell_amount(position, bid_price, row, other_token_position=0):
             buy_amount = 0
 
     # Ensure minimum order size compliance
-    if buy_amount > 0.7 * row['min_size'] and buy_amount < row['min_size']:
-        buy_amount = row['min_size']
+    min_size = row.get('min_size', 0)
+    if pd.isna(min_size) or min_size is None or min_size == '':
+        min_size = 0
+    min_size = float(min_size)
+    
+    # If buy_amount is close to min_size but below it, round up to min_size
+    if buy_amount > 0.7 * min_size and buy_amount < min_size and min_size > 0:
+        buy_amount = min_size
 
     # Apply multiplier for low-priced assets
     if bid_price < 0.1 and buy_amount > 0:
-        if row['multiplier'] != '':
-            print(f"Multiplying buy amount by {int(row['multiplier'])}")
-            buy_amount = buy_amount * int(row['multiplier'])
+        multiplier = row.get('multiplier', '')
+        if multiplier and multiplier != '' and str(multiplier).isdigit():
+            print(f"Multiplying buy amount by {int(multiplier)}")
+            buy_amount = buy_amount * int(multiplier)
 
     return buy_amount, sell_amount
 

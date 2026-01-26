@@ -377,17 +377,26 @@ async def perform_trade(market_or_token):
                         continue
 
                 # ------- BUY ORDER LOGIC -------
-                # Get max_size, defaulting to trade_size if not specified
+                # Get max_size, defaulting to trade_size if not specified or NaN
                 max_size = row.get('max_size', row['trade_size'])
+                if pd.isna(max_size) or max_size is None or max_size == '':
+                    max_size = row['trade_size']
+                max_size = float(max_size)
                 
                 # Debug logging
-                print(f"BUY CHECK: position={position}, max_size={max_size}, buy_amount={buy_amount}, min_size={row['min_size']}")
+                print(f"BUY CHECK: position={position}, max_size={max_size}, buy_amount={buy_amount}, min_size={row['min_size']}, trade_size={row['trade_size']}")
                 
                 # Only buy if:
                 # 1. Position is less than max_size (new logic)
                 # 2. Position is less than absolute cap (250)
-                # 3. Buy amount is above minimum size
-                if position < max_size and position < 250 and buy_amount > 0 and buy_amount >= row['min_size']:
+                # 3. Buy amount is above minimum size (but allow if min_size is 0 or very small)
+                min_size = float(row.get('min_size', 0)) if not pd.isna(row.get('min_size', 0)) else 0
+                
+                # If min_size is too high relative to trade_size, use trade_size as minimum
+                if min_size > row['trade_size']:
+                    min_size = row['trade_size']
+                
+                if position < max_size and position < 250 and buy_amount > 0 and (min_size == 0 or buy_amount >= min_size):
                     # Get reference price from market data
                     sheet_value = row['best_bid']
 
