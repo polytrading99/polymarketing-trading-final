@@ -290,13 +290,14 @@ def sync_markets_from_database():
                 
             except Exception as e:
                 # Catch all errors including Settings validation errors
-                error_msg = str(e) if e else "Unknown error"
-                error_type = type(e).__name__ if e else "Unknown"
-                print(f"Error loading markets from database: {error_type}: {error_msg}")
+                # Use safe error formatting to avoid TypeError
+                try:
+                    error_msg = str(e) if e else "Unknown error"
+                    error_type = type(e).__name__ if e else "Unknown"
+                    print(f"Error loading markets from database: {error_type}: {error_msg}")
+                except Exception:
+                    print(f"Error loading markets from database: Exception occurred (could not format error)")
                 # Don't print full traceback for Settings errors - they're expected
-                if "Settings" not in error_type and "validation" not in error_msg.lower():
-                    import traceback
-                    traceback.print_exc()
                 return pd.DataFrame()
         
         # Use ThreadPoolExecutor to run async code in a separate thread
@@ -315,9 +316,11 @@ def sync_markets_from_database():
             return future.result(timeout=30)  # 30 second timeout
             
     except Exception as e:
-        print(f"Error syncing markets from database: {e}")
-        import traceback
-        traceback.print_exc()
+        # Safe error formatting to avoid TypeError
+        try:
+            print(f"Error syncing markets from database: {str(e)}")
+        except Exception:
+            print(f"Error syncing markets from database: Exception occurred")
         return pd.DataFrame()
 
 
@@ -436,12 +439,16 @@ def update_markets():
                 for col2 in [f"{token1}_buy", f"{token1}_sell", f"{token2}_buy", f"{token2}_sell"]:
                     if col2 not in global_state.performing:
                         global_state.performing[col2] = set()
-            except (KeyError, TypeError, AttributeError) as e:
-                print(f"Error processing market row {idx}: {type(e).__name__}: {e}")
-                import traceback
-                traceback.print_exc()
+            except Exception as e:
+                # Safe error formatting
+                try:
+                    print(f"Error processing market row {idx}: {type(e).__name__}: {str(e)}")
+                except Exception:
+                    print(f"Error processing market row {idx}: Exception occurred")
                 continue
     except Exception as e:
-        print(f"Error in market processing loop: {e}")
-        import traceback
-        traceback.print_exc()
+        # Safe error formatting
+        try:
+            print(f"Error in market processing loop: {str(e)}")
+        except Exception:
+            print(f"Error in market processing loop: Exception occurred")
