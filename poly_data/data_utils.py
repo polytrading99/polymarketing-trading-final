@@ -236,13 +236,14 @@ def sync_markets_from_database():
                 
                 # Create engine and session directly (bypassing Settings)
                 engine = create_async_engine(database_url, echo=False)
-                async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+                from sqlalchemy.ext.asyncio import async_sessionmaker
+                async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
                 
                 # Import models
                 from app.database.models import Market, MarketConfig, Strategy
                 
                 market_data = []
-                async with async_session() as session:
+                async with async_session_factory() as session:
                     # Get active markets directly
                     from sqlalchemy import and_
                     markets_stmt = select(Market).where(Market.status == "active")
